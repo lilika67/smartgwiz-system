@@ -8,6 +8,7 @@ export default function UserDashboard() {
     const [activeTab, setActiveTab] = useState("predict")
     const [districts, setDistricts] = useState([])
     const [loadingDistricts, setLoadingDistricts] = useState(false)
+    const [user, setUser] = useState(null)
 
     const [formData, setFormData] = useState({
         country: "Rwanda",
@@ -38,31 +39,51 @@ export default function UserDashboard() {
     const [prediction, setPrediction] = useState(null)
     const [error, setError] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [showSuccessMessage, setShowSuccessMessage] = useState(false)
     const [yieldError, setYieldError] = useState("")
+    const [yieldSuccess, setYieldSuccess] = useState("")
 
-    // Authentication token
-    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIrMjUwNzg4MTEyMjMzIiwicm9sZSI6ImZhcm1lciIsImV4cCI6MTc2MTg2NjcxMH0.C6sww7XLUNlUNmuLwV-CM0Li9fJd4UPDAJXR90FtatI"
+    // History states
+    const [predictionHistory, setPredictionHistory] = useState([])
+    const [loadingHistory, setLoadingHistory] = useState(false)
+    const [historyError, setHistoryError] = useState("")
+
+    // Backend URL
+    const BACKEND_URL = "https://smartgwiza-be-1.onrender.com"
+
+    // Get user data and token from localStorage
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const userData = {
+                fullname: localStorage.getItem('userFullname') || 'Farmer',
+                role: localStorage.getItem('userRole') || 'farmer',
+                phone: localStorage.getItem('userPhone') || ''
+            }
+            setUser(userData)
+        }
+    }, [])
+
+    // Get token from localStorage
+    const getToken = () => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('authToken') || localStorage.getItem('token')
+        }
+        return null
+    }
 
     // Auth headers utility function
     const getAuthHeaders = () => {
+        const token = getToken()
         return {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
         }
     }
 
-    // Fetch Rwanda districts from API
+    // Fetch Rwanda districts
     useEffect(() => {
         const fetchDistricts = async () => {
             setLoadingDistricts(true)
             try {
-                // You can replace this with your actual API endpoint for Rwanda districts
-                const response = await fetch("https://restcountries.com/v3.1/name/rwanda?fullText=true")
-                const data = await response.json()
-
-                // Since the restcountries API doesn't provide districts, we'll use a fallback list
-                // In a real application, you would use your own API endpoint that returns Rwanda districts
                 const rwandaDistricts = [
                     "Kigali City", "Gasabo", "Nyarugenge", "Kicukiro",
                     "Eastern Province", "Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana",
@@ -70,11 +91,9 @@ export default function UserDashboard() {
                     "Southern Province", "Gisagara", "Huye", "Kamonyi", "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango",
                     "Western Province", "Karongi", "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rusizi", "Rutsiro"
                 ]
-
                 setDistricts(rwandaDistricts.sort())
             } catch (error) {
                 console.error("Error fetching districts:", error)
-                // Fallback districts in case API fails
                 const fallbackDistricts = [
                     "Kigali City", "Gasabo", "Nyarugenge", "Kicukiro",
                     "Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana",
@@ -91,6 +110,56 @@ export default function UserDashboard() {
         fetchDistricts()
     }, [])
 
+    // Fetch prediction history
+    const fetchPredictionHistory = async () => {
+        setLoadingHistory(true)
+        setHistoryError("")
+
+        try {
+            const token = getToken()
+            if (!token) {
+                setHistoryError("Please login to view prediction history")
+                setLoadingHistory(false)
+                return
+            }
+
+            const response = await fetch(`${BACKEND_URL}/api/predictions/history?limit=10`, {
+                method: "GET",
+                headers: getAuthHeaders(),
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}`)
+            }
+
+            const historyData = await response.json()
+            console.log("📊 Prediction History:", historyData)
+
+            // Handle both array and object response formats
+            if (Array.isArray(historyData)) {
+                setPredictionHistory(historyData)
+            } else if (historyData.predictions && Array.isArray(historyData.predictions)) {
+                setPredictionHistory(historyData.predictions)
+            } else if (historyData.data && Array.isArray(historyData.data)) {
+                setPredictionHistory(historyData.data)
+            } else {
+                setPredictionHistory([])
+            }
+        } catch (err) {
+            console.error("💥 History Error:", err)
+            setHistoryError(`Failed to load prediction history: ${err.message}`)
+        } finally {
+            setLoadingHistory(false)
+        }
+    }
+
+    // Load history when history tab is active
+    useEffect(() => {
+        if (activeTab === "history") {
+            fetchPredictionHistory()
+        }
+    }, [activeTab])
+
     const handleInputChange = (e) => {
         const { name, value } = e.target
         setFormData((prev) => ({ ...prev, [name]: value }))
@@ -105,10 +174,28 @@ export default function UserDashboard() {
         e.preventDefault()
         setIsSubmitting(true)
         setError("")
+        setPrediction(null)
 
         try {
             console.log("📤 Starting prediction submission...")
 
+            // Check if user is authenticated
+            const token = getToken()
+            if (!token) {
+                setError("Please login first to make predictions")
+                setIsSubmitting(false)
+                return
+            }
+
+            // Validate required fields
+            if (!formData.district || !formData.rainfall_mm || !formData.temperature_c ||
+                !formData.soil_ph || !formData.fertilizer_used_kg_per_ha || !formData.pesticide_l_per_ha) {
+                setError("Please fill in all required fields")
+                setIsSubmitting(false)
+                return
+            }
+
+            // Prepare payload matching API requirements
             const payload = {
                 district: formData.district,
                 rainfall_mm: Number.parseFloat(formData.rainfall_mm),
@@ -120,9 +207,8 @@ export default function UserDashboard() {
             }
 
             console.log("📦 Prediction Payload:", payload)
-            console.log("🔑 Using token:", token)
 
-            const response = await fetch("http://0.0.0.0:8000/api/predict", {
+            const response = await fetch(`${BACKEND_URL}/api/predict`, {
                 method: "POST",
                 headers: getAuthHeaders(),
                 body: JSON.stringify(payload),
@@ -148,15 +234,22 @@ export default function UserDashboard() {
             const result = await response.json()
             console.log("✅ Prediction Success:", result)
 
-            const yieldTonsHa = result.predicted_yield_kg_per_ha / 1000 // Convert kg/ha to tons/ha
-
+            // The API returns predicted_yield directly in tons/ha
             setPrediction({
-                value: yieldTonsHa.toFixed(3),
-                warning: result.warning || null,
+                predicted_yield: result.predicted_yield,
+                confidence: result.confidence,
+                interpretation: result.interpretation,
+                prediction_id: result.prediction_id,
+                timestamp: result.timestamp
             })
+
+            // Refresh history after new prediction
+            if (activeTab === "history") {
+                fetchPredictionHistory()
+            }
         } catch (err) {
             console.error("💥 Prediction Error:", err)
-            setError(`Error predicting: ${err.message}`)
+            setError(`Error predicting yield: ${err.message}`)
         } finally {
             setIsSubmitting(false)
         }
@@ -166,9 +259,31 @@ export default function UserDashboard() {
         e.preventDefault()
         setIsSubmitting(true)
         setYieldError("")
+        setYieldSuccess("")
 
         try {
             console.log("📤 Starting yield submission...")
+
+            // Check if user is authenticated
+            const token = getToken()
+            if (!token) {
+                setYieldError("Please login first to submit yield data")
+                setIsSubmitting(false)
+                return
+            }
+
+            // Validate required fields
+            const requiredFields = [
+                'district', 'rainfall_mm', 'temperature_c', 'soil_ph',
+                'irrigation_type', 'actual_yield_tons_per_ha'
+            ]
+
+            const missingFields = requiredFields.filter(field => !yieldForm[field])
+            if (missingFields.length > 0) {
+                setYieldError(`Please fill in all required fields: ${missingFields.join(', ')}`)
+                setIsSubmitting(false)
+                return
+            }
 
             // Prepare payload matching API requirements
             const payload = {
@@ -176,19 +291,18 @@ export default function UserDashboard() {
                 rainfall_mm: Number.parseFloat(yieldForm.rainfall_mm),
                 temperature_c: Number.parseFloat(yieldForm.temperature_c),
                 soil_ph: Number.parseFloat(yieldForm.soil_ph),
-                fertilizer_kg_per_ha: Number.parseFloat(yieldForm.fertilizer_kg_per_ha),
-                pesticide_l_per_ha: Number.parseFloat(yieldForm.pesticide_l_per_ha),
+                fertilizer_kg_per_ha: yieldForm.fertilizer_kg_per_ha ? Number.parseFloat(yieldForm.fertilizer_kg_per_ha) : 0,
+                pesticide_l_per_ha: yieldForm.pesticide_l_per_ha ? Number.parseFloat(yieldForm.pesticide_l_per_ha) : 0,
                 irrigation_type: yieldForm.irrigation_type,
                 actual_yield_tons_per_ha: Number.parseFloat(yieldForm.actual_yield_tons_per_ha),
-                planting_date: yieldForm.planting_date,
-                harvest_date: yieldForm.harvest_date,
-                notes: yieldForm.notes,
+                planting_date: yieldForm.planting_date || "",
+                harvest_date: yieldForm.harvest_date || "",
+                notes: yieldForm.notes || "",
             }
 
             console.log("📦 Yield Payload:", payload)
-            console.log("🔑 Using token:", token)
 
-            const response = await fetch("http://0.0.0.0:8000/api/data/submit", {
+            const response = await fetch(`${BACKEND_URL}/api/data/submit`, {
                 method: "POST",
                 headers: getAuthHeaders(),
                 body: JSON.stringify(payload),
@@ -215,23 +329,28 @@ export default function UserDashboard() {
             console.log("✅ Yield Success:", result)
 
             // Success - show message and reset form
-            setShowSuccessMessage(true)
+            setYieldSuccess(result.message || "Yield data submitted successfully! Thank you for contributing.")
+
+            // Reset form
+            setYieldForm({
+                district: "",
+                rainfall_mm: "",
+                temperature_c: "",
+                soil_ph: "",
+                fertilizer_kg_per_ha: "",
+                pesticide_l_per_ha: "",
+                irrigation_type: "Rainfed",
+                actual_yield_tons_per_ha: "",
+                planting_date: "",
+                harvest_date: "",
+                notes: "",
+            })
+
+            // Clear success message after 5 seconds
             setTimeout(() => {
-                setShowSuccessMessage(false)
-                setYieldForm({
-                    district: "",
-                    rainfall_mm: "",
-                    temperature_c: "",
-                    soil_ph: "",
-                    fertilizer_kg_per_ha: "",
-                    pesticide_l_per_ha: "",
-                    irrigation_type: "Rainfed",
-                    actual_yield_tons_per_ha: "",
-                    planting_date: "",
-                    harvest_date: "",
-                    notes: "",
-                })
-            }, 3000)
+                setYieldSuccess("")
+            }, 5000)
+
         } catch (err) {
             console.error("💥 Yield Error:", err)
             const errorMessage = err.message || err.toString() || "Unknown error occurred"
@@ -240,6 +359,58 @@ export default function UserDashboard() {
             setIsSubmitting(false)
         }
     }
+
+    // Get confidence color
+    const getConfidenceColor = (confidence) => {
+        switch (confidence) {
+            case 'high': return 'text-green-600'
+            case 'medium': return 'text-yellow-600'
+            case 'low': return 'text-red-600'
+            default: return 'text-gray-600'
+        }
+    }
+
+    // Format date for display
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A'
+        try {
+            return new Date(dateString).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+        } catch {
+            return dateString
+        }
+    }
+
+    // Handle logout
+    const handleLogout = () => {
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('authToken')
+            localStorage.removeItem('token')
+            localStorage.removeItem('userRole')
+            localStorage.removeItem('userFullname')
+            localStorage.removeItem('userPhone')
+            window.location.href = '/'
+        }
+    }
+
+    // Calculate statistics for visualization
+    const calculateStats = () => {
+        if (predictionHistory.length === 0) return null
+
+        const yields = predictionHistory.map(p => p.predicted_yield || p.yield).filter(y => y != null)
+        const avgYield = yields.length > 0 ? yields.reduce((a, b) => a + b, 0) / yields.length : 0
+        const maxYield = Math.max(...yields)
+        const minYield = Math.min(...yields)
+
+        return { avgYield, maxYield, minYield, totalPredictions: predictionHistory.length }
+    }
+
+    const stats = calculateStats()
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex">
@@ -267,6 +438,19 @@ export default function UserDashboard() {
                             <div>
                                 <h1 className="text-lg font-bold text-slate-900">SmartGwiza</h1>
                                 <p className="text-xs text-slate-500">Farmer Dashboard</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* User Info */}
+                    <div className="p-4 border-b border-slate-200">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold" style={{ backgroundColor: "#598216" }}>
+                                {user?.fullname?.charAt(0) || 'F'}
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-slate-900">{user?.fullname || 'Farmer'}</p>
+                                <p className="text-xs text-slate-500 capitalize">{user?.role || 'farmer'}</p>
                             </div>
                         </div>
                     </div>
@@ -307,9 +491,11 @@ export default function UserDashboard() {
                             Submit Actual Yield
                         </button>
 
-                        <a
-                            href="/dashboard/history"
-                            className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                        <button
+                            onClick={() => setActiveTab("history")}
+                            className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${activeTab === "history" ? "text-white" : "text-slate-700 hover:bg-slate-100"
+                                }`}
+                            style={activeTab === "history" ? { backgroundColor: "#598216" } : {}}
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path
@@ -320,7 +506,7 @@ export default function UserDashboard() {
                                 />
                             </svg>
                             Prediction History
-                        </a>
+                        </button>
 
                         <a
                             href="/dashboard/profile"
@@ -354,7 +540,10 @@ export default function UserDashboard() {
                             </svg>
                             Back to Home
                         </Link>
-                        <button className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors w-full mt-1">
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors w-full mt-1"
+                        >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path
                                     strokeLinecap="round"
@@ -386,12 +575,16 @@ export default function UserDashboard() {
                             <div className="flex items-center gap-3">
                                 <div>
                                     <h1 className="text-xl font-bold text-slate-900">
-                                        {activeTab === "predict" ? "Crop Yield Prediction" : "Submit Actual Yield"}
+                                        {activeTab === "predict" ? "Crop Yield Prediction" :
+                                            activeTab === "feedback" ? "Submit Actual Yield" :
+                                                "Prediction History"}
                                     </h1>
                                     <p className="text-sm text-slate-500 mt-1">
                                         {activeTab === "predict"
                                             ? "Get AI-powered predictions for your farm"
-                                            : "Help improve our model with your harvest data"}
+                                            : activeTab === "feedback"
+                                                ? "Help improve our model with your harvest data"
+                                                : "View your prediction history and insights"}
                                     </p>
                                 </div>
                             </div>
@@ -401,7 +594,7 @@ export default function UserDashboard() {
                                     className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
                                     style={{ backgroundColor: "#598216" }}
                                 >
-                                    {/* User initial */}
+                                    {user?.fullname?.charAt(0) || 'F'}
                                 </div>
                             </div>
                         </div>
@@ -532,7 +725,7 @@ export default function UserDashboard() {
                                             value={formData.soil_ph}
                                             onChange={handleInputChange}
                                             className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 transition-all bg-white text-gray-900"
-                                            style={{ borderColor: "rgba(89, 130, 22, 0.3)" }}
+                                            style={{ borderColor: "rgau(89, 130, 22, 0.3)" }}
                                             onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
                                             placeholder="e.g., 6.5"
@@ -632,10 +825,18 @@ export default function UserDashboard() {
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="w-full py-3 px-6 text-white font-medium rounded-lg transition-opacity disabled:opacity-50"
+                                    className="w-full py-3 px-6 text-white font-medium rounded-lg transition-opacity disabled:opacity-50 hover:opacity-90"
                                     style={{ backgroundColor: "#598216" }}
                                 >
-                                    {isSubmitting ? "Processing..." : "Predict Yield"}
+                                    {isSubmitting ? (
+                                        <div className="flex items-center justify-center gap-2">
+                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Processing...
+                                        </div>
+                                    ) : "Predict Yield"}
                                 </button>
                             </form>
 
@@ -717,30 +918,33 @@ export default function UserDashboard() {
                                             </p>
                                             <div className="flex items-center gap-2">
                                                 <p className="font-bold text-xl" style={{ color: "#598216" }}>
-                                                    {prediction.value} tons/ha
+                                                    {prediction.predicted_yield} tons/ha
                                                 </p>
                                             </div>
-                                        </div>
-                                        {prediction.warning && (
-                                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
-                                                <div className="flex items-start gap-2">
-                                                    <svg className="h-5 w-5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path
-                                                            fillRule="evenodd"
-                                                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                                            clipRule="evenodd"
-                                                        />
-                                                    </svg>
-                                                    <p>{prediction.warning}</p>
-                                                </div>
+                                            <div className="mt-2">
+                                                <p className="text-sm text-gray-600">
+                                                    <span className="font-medium">Confidence: </span>
+                                                    <span className={`capitalize ${getConfidenceColor(prediction.confidence)}`}>
+                                                        {prediction.confidence}
+                                                    </span>
+                                                </p>
+                                                <p className="text-sm text-gray-600 mt-1">
+                                                    <span className="font-medium">Interpretation: </span>
+                                                    {prediction.interpretation}
+                                                </p>
+                                                {prediction.prediction_id && (
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        Prediction ID: {prediction.prediction_id}
+                                                    </p>
+                                                )}
                                             </div>
-                                        )}
+                                        </div>
                                         <button
                                             onClick={() => setPrediction(null)}
                                             className="w-full mt-6 py-3 px-6 text-white font-medium rounded-lg hover:opacity-90 transition-opacity"
                                             style={{ backgroundColor: "#598216" }}
                                         >
-                                            Done
+                                            Make Another Prediction
                                         </button>
                                     </div>
                                 </div>
@@ -750,22 +954,18 @@ export default function UserDashboard() {
 
                     {activeTab === "feedback" && (
                         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            {showSuccessMessage && (
-                                <div
-                                    className="mb-6 p-4 rounded-lg border"
-                                    style={{ borderColor: "#598216", backgroundColor: "#f0f7e6" }}
-                                >
+                            <div className="mb-6">
+                                <h2 className="text-xl font-bold text-slate-900 mb-2">Submit Your Actual Yield Data</h2>
+                                <p className="text-slate-600">Help improve our prediction model by sharing your actual harvest results.</p>
+                            </div>
+
+                            {yieldSuccess && (
+                                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                                     <div className="flex items-center gap-2">
-                                        <svg className="w-5 h-5" style={{ color: "#598216" }} fill="currentColor" viewBox="0 0 20 20">
-                                            <path
-                                                fillRule="evenodd"
-                                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 11.586 7.707 10.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                clipRule="evenodd"
-                                            />
+                                        <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                         </svg>
-                                        <p className="text-sm font-medium" style={{ color: "#598216" }}>
-                                            Thank you! Your yield data has been submitted successfully.
-                                        </p>
+                                        <p className="text-green-700 font-medium">{yieldSuccess}</p>
                                     </div>
                                 </div>
                             )}
@@ -787,13 +987,16 @@ export default function UserDashboard() {
 
                             <form onSubmit={handleYieldSubmit} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Required Fields */}
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">District *</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            District <span className="text-red-500">*</span>
+                                        </label>
                                         <select
                                             name="district"
                                             value={yieldForm.district}
                                             onChange={handleYieldInputChange}
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                             required
                                         >
                                             <option value="">Select District</option>
@@ -810,7 +1013,9 @@ export default function UserDashboard() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Rainfall (mm) *</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Rainfall (mm) <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="number"
                                             name="rainfall_mm"
@@ -820,13 +1025,15 @@ export default function UserDashboard() {
                                             min="500"
                                             max="2000"
                                             step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                             required
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Temperature (°C) *</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Temperature (°C) <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="number"
                                             name="temperature_c"
@@ -836,13 +1043,15 @@ export default function UserDashboard() {
                                             min="15"
                                             max="30"
                                             step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                             required
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Soil pH *</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Soil pH <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="number"
                                             name="soil_ph"
@@ -852,48 +1061,20 @@ export default function UserDashboard() {
                                             min="0"
                                             max="14"
                                             step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                             required
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Fertilizer (kg/ha) *</label>
-                                        <input
-                                            type="number"
-                                            name="fertilizer_kg_per_ha"
-                                            value={yieldForm.fertilizer_kg_per_ha}
-                                            onChange={handleYieldInputChange}
-                                            placeholder="e.g., 150"
-                                            min="0"
-                                            step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Pesticide (L/ha) *</label>
-                                        <input
-                                            type="number"
-                                            name="pesticide_l_per_ha"
-                                            value={yieldForm.pesticide_l_per_ha}
-                                            onChange={handleYieldInputChange}
-                                            placeholder="e.g., 2.5"
-                                            min="0"
-                                            step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Irrigation Type *</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Irrigation Type <span className="text-red-500">*</span>
+                                        </label>
                                         <select
                                             name="irrigation_type"
                                             value={yieldForm.irrigation_type}
                                             onChange={handleYieldInputChange}
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                             required
                                         >
                                             <option value="Rainfed">Rainfed</option>
@@ -902,7 +1083,9 @@ export default function UserDashboard() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Actual Yield (tons/ha) *</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Actual Yield (tons/ha) <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="number"
                                             step="0.001"
@@ -910,45 +1093,96 @@ export default function UserDashboard() {
                                             value={yieldForm.actual_yield_tons_per_ha}
                                             onChange={handleYieldInputChange}
                                             placeholder="e.g., 1.501"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
+                                            min="0"
+                                            step="0.001"
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                             required
                                         />
                                     </div>
 
+                                    {/* Optional Fields */}
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Planting Date *</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Fertilizer Used (kg/ha) <span className="text-gray-400 text-xs">(Optional)</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="fertilizer_kg_per_ha"
+                                            value={yieldForm.fertilizer_kg_per_ha}
+                                            onChange={handleYieldInputChange}
+                                            placeholder="e.g., 150"
+                                            min="0"
+                                            step="0.1"
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Pesticide Used (L/ha) <span className="text-gray-400 text-xs">(Optional)</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="pesticide_l_per_ha"
+                                            value={yieldForm.pesticide_l_per_ha}
+                                            onChange={handleYieldInputChange}
+                                            placeholder="e.g., 2.5"
+                                            min="0"
+                                            step="0.1"
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Planting Date <span className="text-gray-400 text-xs">(Optional)</span>
+                                        </label>
                                         <input
                                             type="date"
                                             name="planting_date"
                                             value={yieldForm.planting_date}
                                             onChange={handleYieldInputChange}
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
-                                            required
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Harvest Date *</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Harvest Date <span className="text-gray-400 text-xs">(Optional)</span>
+                                        </label>
                                         <input
                                             type="date"
                                             name="harvest_date"
                                             value={yieldForm.harvest_date}
                                             onChange={handleYieldInputChange}
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none"
-                                            required
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                         />
                                     </div>
 
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Additional Notes (Optional)</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Additional Notes <span className="text-gray-400 text-xs">(Optional)</span>
+                                        </label>
                                         <textarea
                                             name="notes"
                                             value={yieldForm.notes}
                                             onChange={handleYieldInputChange}
                                             placeholder="Any challenges faced, weather conditions, or other observations..."
                                             rows={4}
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 outline-none resize-none"
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none resize-none transition-colors"
                                         />
+                                    </div>
+                                </div>
+
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm font-medium text-blue-800">Fields marked with <span className="text-red-500">*</span> are required</p>
+                                            <p className="text-sm text-blue-700 mt-1">Your data helps improve the AI model for all farmers in Rwanda</p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -958,9 +1192,207 @@ export default function UserDashboard() {
                                     className="w-full py-3 px-6 text-white font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
                                     style={{ backgroundColor: "#598216" }}
                                 >
-                                    {isSubmitting ? "Submitting..." : "Submit Yield Data"}
+                                    {isSubmitting ? (
+                                        <div className="flex items-center justify-center gap-2">
+                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Submitting...
+                                        </div>
+                                    ) : "Submit Yield Data"}
                                 </button>
                             </form>
+                        </div>
+                    )}
+
+                    {activeTab === "history" && (
+                        <div className="space-y-6">
+                            {/* Statistics Cards */}
+                            {stats && (
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(89, 130, 22, 0.1)" }}>
+                                                <svg className="w-5 h-5" style={{ color: "#598216" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-600">Total Predictions</p>
+                                                <p className="text-xl font-bold text-slate-900">{stats.totalPredictions}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(89, 130, 22, 0.1)" }}>
+                                                <svg className="w-5 h-5" style={{ color: "#598216" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-600">Average Yield</p>
+                                                <p className="text-xl font-bold text-slate-900">{stats.avgYield.toFixed(2)} tons/ha</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(89, 130, 22, 0.1)" }}>
+                                                <svg className="w-5 h-5" style={{ color: "#598216" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-600">Highest Yield</p>
+                                                <p className="text-xl font-bold text-slate-900">{stats.maxYield.toFixed(2)} tons/ha</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(89, 130, 22, 0.1)" }}>
+                                                <svg className="w-5 h-5" style={{ color: "#598216" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-600">Lowest Yield</p>
+                                                <p className="text-xl font-bold text-slate-900">{stats.minYield.toFixed(2)} tons/ha</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Yield Trend Chart */}
+                            {predictionHistory.length > 0 && (
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Yield Prediction Trend</h3>
+                                    <div className="h-64 flex items-end gap-2 pb-8 border-b border-slate-200">
+                                        {predictionHistory.slice(0, 10).map((prediction, index) => {
+                                            const yieldValue = prediction.predicted_yield || prediction.yield || 0
+                                            const maxYield = Math.max(...predictionHistory.slice(0, 10).map(p => p.predicted_yield || p.yield || 0))
+                                            const height = maxYield > 0 ? (yieldValue / maxYield) * 80 : 0
+
+                                            return (
+                                                <div key={prediction.id || index} className="flex-1 flex flex-col items-center">
+                                                    <div
+                                                        className="w-full rounded-t transition-all hover:opacity-80"
+                                                        style={{
+                                                            height: `${height}%`,
+                                                            backgroundColor: "#598216",
+                                                            minHeight: '20px'
+                                                        }}
+                                                        title={`${yieldValue.toFixed(2)} tons/ha`}
+                                                    ></div>
+                                                    <div className="text-xs text-slate-500 mt-2 text-center">
+                                                        {prediction.district?.substring(0, 3)}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                    <div className="mt-4 text-sm text-slate-600">
+                                        <p>Showing last {Math.min(predictionHistory.length, 10)} predictions</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Prediction History Table */}
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="p-6 border-b border-slate-200">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-lg font-semibold text-slate-900">Recent Predictions</h3>
+                                        <button
+                                            onClick={fetchPredictionHistory}
+                                            disabled={loadingHistory}
+                                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:opacity-80 disabled:opacity-50"
+                                            style={{ backgroundColor: "#598216", color: "white" }}
+                                        >
+                                            <svg className={`w-4 h-4 ${loadingHistory ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                            {loadingHistory ? 'Refreshing...' : 'Refresh'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {loadingHistory ? (
+                                    <div className="p-8 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <svg className="animate-spin h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <p className="text-slate-600">Loading prediction history...</p>
+                                        </div>
+                                    </div>
+                                ) : historyError ? (
+                                    <div className="p-6 text-center">
+                                        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                                            <p className="text-red-700">{historyError}</p>
+                                        </div>
+                                    </div>
+                                ) : predictionHistory.length === 0 ? (
+                                    <div className="p-8 text-center">
+                                        <svg className="w-12 h-12 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                        </svg>
+                                        <h4 className="text-lg font-medium text-slate-900 mb-2">No predictions yet</h4>
+                                        <p className="text-slate-600 mb-4">Make your first prediction to see it here!</p>
+                                        <button
+                                            onClick={() => setActiveTab("predict")}
+                                            className="px-6 py-2 text-white font-medium rounded-lg transition-opacity hover:opacity-80"
+                                            style={{ backgroundColor: "#598216" }}
+                                        >
+                                            Make Prediction
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="bg-slate-50">
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date & Time</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">District</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Predicted Yield</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Confidence</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Irrigation</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200">
+                                                {predictionHistory.map((prediction, index) => (
+                                                    <tr key={prediction.id || index} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                                                            {formatDate(prediction.timestamp || prediction.created_at)}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                                                            {prediction.district || 'N/A'}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                                                            {(prediction.predicted_yield || prediction.yield || 0).toFixed(2)} tons/ha
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getConfidenceColor(prediction.confidence)}`}>
+                                                                {prediction.confidence || 'medium'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                                                            {prediction.irrigation_type || 'Rainfed'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </main>
