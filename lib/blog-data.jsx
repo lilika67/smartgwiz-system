@@ -1,33 +1,32 @@
-export const blogCategories = ["Byose", "Ubuhinzi bw'ibigori", "Kurwanya udukoko", "Tekinoroji"]
-
+export const blogCategories = ["All", "Maize Farming", "Pest Control", "Technology"]
 
 export const blogArticles = [
     {
-        slug: "ibihe byiza byo gutera ibigori mu Rwanda",
-        title: "ibihe byiza byo gutera ibigori mu Rwanda",
+        slug: "optimal-maize-planting-season-rwanda",
+        title: "Optimal Maize Planting Season in Rwanda",
         excerpt:
-            "Menya igihe cyiza cyo guhinga ibigori mu turere dutandukanye tw'u Rwanda kugira ngo ubone umusaruro mwinshi kandi uzagire umusaruro mwiza.",
+            "Learn about the best times to plant maize in Rwanda's different regions to maximize your yield and ensure a successful harvest.",
         content: `
-# Igihe cyiza cyo guhinga ibigori mu Rwanda
+# Optimal Maize Planting Season in Rwanda
 
-Ikirere cy'u Rwanda gitanga ibihe bibiri by'ingenzi byo guhinga ibigori, kandi kumenya igihe cyo kubiba ni iby'ingenzi kugira ngo umusaruro wawe ube mwinshi.
+Rwanda's climate offers two main growing seasons for maize cultivation, and understanding when to plant is crucial for maximizing your yield.
 
-## Igihembwe cy'ihinga A (Nyakanga - Mutarama)
+## Season A (September - January)
 
-Igihe cya mbere cyo kubiba, cyitwa Igihembwe cya A, ubusanzwe gitangira muri Nzeri kikageza muri Mutarama. Iki gifatwa nk'igihe cy'ibanze cyo guhinga mu turere twinshi tw'u Rwanda.
+The first planting season, known as Season A, typically runs from September to January. This is considered the primary growing season in most regions of Rwanda.
 
-**Ibintu by'ingenzi by'igihembwe cya A:**
-- Gutera imbuto biba hagati y'ukwezi kwa Nzeri n'intangiriro z'Ukwakira
-- Mbere yo gutera, ujye ugenzura niba ubutaka bufite amazi ahagije
-- Muri iki gihe cy'umwaka, imvura igwa buri gihe
-- Umusaruro ubusanzwe ukorwa muri Mutarama-Gashyantare
+**Key considerations for Season A:**
+- Plant between mid-September and early October
+- Ensure soil moisture is adequate before planting
+- This season benefits from consistent rainfall patterns
+- Harvest typically occurs in January-February
 
-## Igihembwe cy'ihinga cya B (Mutarama - Kamena)
+## Season B (February - June)
 
-Igihembwe cya kabiri, cyitwa Igihembwe cya B, gitangira muri Gashyantare kikagera muri Kamena kandi ni ingenzi cyane mu musaruro w'ibigori.
+The second season, Season B, runs from February to June and is equally important for maize production.
 
-**Ibintu by'ingenzi by'igihembwe cya B:**
-- Gutera imbuto biba hagati ya Gashyantare na Werurwe
+**Key considerations for Season B:**
+- Plant between mid-February and early March
 - Monitor rainfall patterns closely
 - This season may require supplementary irrigation in some regions
 - Harvest typically occurs in June-July
