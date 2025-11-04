@@ -79,27 +79,69 @@ export function LoginForm({ onSwitchToSignup }) {
     }, [])
 
     // Backend URL - use only one consistent URL
-    const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://smartgwiza-be-1.onrender.com"
+    const BACKEND_URL =  "https://smartgwiza-be-1.onrender.com"
 
+    // IMPROVED: Validate Rwandan phone - accepts both 07... and 7... formats
     const validateRwandanPhone = (phone) => {
-        // Remove all formatting and check if it's a valid Rwandan number
-        const cleaned = phone.replace(/\s/g, "").replace(/^\+?250?/, "")
-        const rwandanPhoneRegex = /^7[0-9]{8}$/
-        return rwandanPhoneRegex.test(cleaned) && cleaned.length === 9
+        // Remove all non-digit characters
+        const cleaned = phone.replace(/\D/g, "")
+
+        // Check if it's valid: should be 10 digits starting with 07, or 9 digits starting with 7
+        if (cleaned.length === 10 && cleaned.startsWith("07")) {
+            return /^07[0-9]{8}$/.test(cleaned)
+        } else if (cleaned.length === 9 && cleaned.startsWith("7")) {
+            return /^7[0-9]{8}$/.test(cleaned)
+        }
+
+        return false
     }
 
+    // IMPROVED: Format phone for backend - handles both 07... and 7... inputs
     const formatPhoneForBackend = (phone) => {
-        // Convert to +250 format that backend expects
-        const cleaned = phone.replace(/\s/g, "").replace(/^\+?250?/, "")
-        return `+250${cleaned}`
+        // Remove all non-digit characters
+        const cleaned = phone.replace(/\D/g, "")
+
+        if (cleaned.startsWith("07")) {
+            return `+25${cleaned}` // +250 + 7... (removes the 0)
+        } else if (cleaned.startsWith("7")) {
+            return `+250${cleaned}` // +250 + 7...
+        }
+
+        return `+250${cleaned}` // Fallback
     }
 
-    const handlePhoneChange = (e) => {
-        const value = e.target.value
-        setPhoneNumber(value)
+    
+    const formatPhoneDisplay = (value) => {
+        // Remove all non-digit characters
+        const cleaned = value.replace(/\D/g, "")
 
-        if (value && !validateRwandanPhone(value)) {
-            setPhoneError("Please enter a valid Rwandan phone number (e.g., 078 123 4567)")
+        // Limit to 10 digits (07XXXXXXXX)
+        const limited = cleaned.slice(0, 10)
+
+        // Format: 078 123 4567 or 0781 234 567
+        if (limited.length === 0) {
+            return ""
+        } else if (limited.length <= 3) {
+            return limited
+        } else if (limited.length <= 6) {
+            return `${limited.slice(0, 3)} ${limited.slice(3)}`
+        } else if (limited.length <= 10) {
+            return `${limited.slice(0, 4)} ${limited.slice(4, 7)} ${limited.slice(7)}`
+        }
+
+        return limited
+    }
+
+    const handlePhoneInput = (e) => {
+        const value = e.target.value
+        const formatted = formatPhoneDisplay(value)
+        setPhoneNumber(formatted)
+
+        // Validate the cleaned number
+        const cleaned = value.replace(/\D/g, "")
+
+        if (cleaned.length > 0 && !validateRwandanPhone(cleaned)) {
+            setPhoneError("Please enter a valid Rwandan phone number (e.g., 0781234567)")
         } else {
             setPhoneError("")
         }
@@ -132,9 +174,10 @@ export function LoginForm({ onSwitchToSignup }) {
                 password: password,
             }
 
-            console.log("Sending login request:", {
+            console.log(" Sending login request:", {
                 url: `${BACKEND_URL}/api/auth/login`,
-                payload: { ...payload, password: "***" } // Hide password in logs
+                phone_number: formattedPhone,
+                password_length: password.length
             })
 
             const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
@@ -146,7 +189,12 @@ export function LoginForm({ onSwitchToSignup }) {
             })
 
             const data = await response.json()
-            console.log("Login response:", { status: response.status, data })
+            console.log(" Login response:", {
+                status: response.status,
+                ok: response.ok,
+                role: data.role,
+                hasToken: !!data.access_token
+            })
 
             if (response.ok) {
                 // Store authentication data
@@ -156,20 +204,27 @@ export function LoginForm({ onSwitchToSignup }) {
                 storage.setItem("userFullname", data.fullname || "")
                 storage.setItem("userPhone", formattedPhone)
 
-                console.log("Login successful! User role:", data.role)
+                console.log(" Login successful! Stored data:", {
+                    role: data.role,
+                    fullname: data.fullname,
+                    phone: formattedPhone
+                })
 
                 // Redirect based on role
                 if (data.role === "farmer") {
+                    console.log(" Redirecting to farmer dashboard...")
                     router.push("/userdashboard")
                 } else if (data.role === "admin") {
+                    console.log(" Redirecting to admin dashboard...")
                     router.push("/admin")
                 } else {
-                    // Default redirect
+                    console.log(" Redirecting to home...")
                     router.push("/")
                 }
             } else {
                 // Handle different error formats from backend
                 const errorMessage = data.detail || data.message || "Login failed. Please check your credentials."
+              
                 setLoginError(errorMessage)
 
                 // Clear form on specific errors
@@ -178,56 +233,11 @@ export function LoginForm({ onSwitchToSignup }) {
                 }
             }
         } catch (err) {
-            console.error("Login error:", err)
+            console.error(" Login error:", err)
             setLoginError(`Network error: ${err.message}. Please check your internet connection and try again.`)
         } finally {
             setIsLoading(false)
         }
-    }
-
-    // Format phone number for display as user types - allow exactly 9 digits after cleaning
-    const formatPhoneDisplay = (value) => {
-        // Remove all non-digit characters
-        const cleaned = value.replace(/\D/g, '')
-
-        // Limit to 9 digits (Rwandan phone numbers without country code)
-        const limited = cleaned.slice(0, 9)
-
-        // Format: 078 123 456
-        if (limited.length <= 3) {
-            return limited
-        } else if (limited.length <= 6) {
-            return `${limited.slice(0, 3)} ${limited.slice(3)}`
-        } else {
-            return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`
-        }
-    }
-
-    const handlePhoneInput = (e) => {
-        const value = e.target.value
-        const formatted = formatPhoneDisplay(value)
-        setPhoneNumber(formatted)
-
-        // Validate the cleaned number
-        const cleaned = value.replace(/\D/g, '')
-        if (cleaned && !validateRwandanPhone(cleaned)) {
-            setPhoneError("Please enter a valid Rwandan phone number (e.g., 0781234567)")
-        } else {
-            setPhoneError("")
-        }
-    }
-
-    // Test credentials button for development
-    const fillTestCredentials = (role) => {
-        if (role === 'farmer') {
-            setPhoneNumber("0781234567")
-            setPassword("password123")
-        } else if (role === 'admin') {
-            setPhoneNumber("0798765432")
-            setPassword("admin123")
-        }
-        setLoginError("")
-        setPhoneError("")
     }
 
     // Don't render form until client-side to avoid hydration issues
@@ -253,13 +263,7 @@ export function LoginForm({ onSwitchToSignup }) {
                 <div className="p-6 sm:p-8 md:p-12 flex flex-col justify-center">
                     <div className="mb-6 sm:mb-8">
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden">
-                                <img
-                                    src="/images/smartgwizalogo"
-                                    alt="SmartGwiza Logo"
-                                    className="w-full h-full object-contain"
-                                />
-                            </div>
+                            
                             <div>
                                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">SmartGwiza</h1>
                                 <p className="text-sm text-slate-500">Agricultural Intelligence Platform</p>
@@ -272,7 +276,6 @@ export function LoginForm({ onSwitchToSignup }) {
                         <p className="text-gray-500 text-sm">Log in to your account to continue</p>
                     </div>
 
-
                     <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
                         <div className="space-y-2">
                             <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
@@ -281,22 +284,26 @@ export function LoginForm({ onSwitchToSignup }) {
                             <input
                                 id="phone"
                                 type="tel"
-                                placeholder="078 123 4567"
+                                placeholder="0781 234 567"
                                 value={phoneNumber}
                                 onChange={handlePhoneInput}
-                                maxLength={12} // 3 + space + 3 + space + 3 = 11 characters max
-                                className={`w-full h-12 px-4 border text-black rounded-lg focus:outline-none focus:ring-2 transition-colors ${phoneError ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:border-green-500 focus:ring-green-200"
+                                maxLength={13} // 0781 234 567 = 13 characters with spaces
+                                className={`w-full h-12 px-4 border text-black rounded-lg focus:outline-none focus:ring-2 transition-colors ${phoneError
+                                        ? "border-red-500 focus:ring-red-200"
+                                        : "border-gray-300 focus:border-green-500 focus:ring-green-200"
                                     }`}
                                 required
                             />
-                            {phoneError && <p className="text-xs text-red-500 flex items-center gap-1">
-                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                </svg>
-                                {phoneError}
-                            </p>}
+                            {phoneError && (
+                                <p className="text-xs text-red-500 flex items-center gap-1">
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                    {phoneError}
+                                </p>
+                            )}
                             <p className="text-xs text-gray-500">
-                                Enter your 10-digit Rwandan phone number (e.g., 0781234567)
+                                Enter your Rwandan phone number (e.g., 0781234567)
                             </p>
                         </div>
 

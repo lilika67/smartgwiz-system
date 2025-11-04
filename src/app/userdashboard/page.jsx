@@ -85,11 +85,11 @@ export default function UserDashboard() {
             setLoadingDistricts(true)
             try {
                 const rwandaDistricts = [
-                    "Kigali City", "Gasabo", "Nyarugenge", "Kicukiro",
-                    "Eastern Province", "Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana",
-                    "Northern Province", "Burera", "Gakenke", "Gicumbi", "Musanze", "Rulindo",
-                    "Southern Province", "Gisagara", "Huye", "Kamonyi", "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango",
-                    "Western Province", "Karongi", "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rusizi", "Rutsiro"
+                    "Gasabo", "Nyarugenge", "Kicukiro",
+                     "Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana",
+                     "Burera", "Gakenke", "Gicumbi", "Musanze", "Rulindo",
+                     "Gisagara", "Huye", "Kamonyi", "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango",
+                     "Karongi", "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rusizi", "Rutsiro"
                 ]
                 setDistricts(rwandaDistricts.sort())
             } catch (error) {
@@ -133,7 +133,7 @@ export default function UserDashboard() {
             }
 
             const historyData = await response.json()
-            console.log("📊 Prediction History:", historyData)
+
 
             // Handle both array and object response formats
             if (Array.isArray(historyData)) {
@@ -146,7 +146,7 @@ export default function UserDashboard() {
                 setPredictionHistory([])
             }
         } catch (err) {
-            console.error("💥 History Error:", err)
+
             setHistoryError(`Failed to load prediction history: ${err.message}`)
         } finally {
             setLoadingHistory(false)
@@ -177,7 +177,6 @@ export default function UserDashboard() {
         setPrediction(null)
 
         try {
-            console.log("📤 Starting prediction submission...")
 
             // Check if user is authenticated
             const token = getToken()
@@ -206,7 +205,7 @@ export default function UserDashboard() {
                 irrigation_type: formData.irrigation_type,
             }
 
-            console.log("📦 Prediction Payload:", payload)
+            
 
             const response = await fetch(`${BACKEND_URL}/api/predict`, {
                 method: "POST",
@@ -214,25 +213,25 @@ export default function UserDashboard() {
                 body: JSON.stringify(payload),
             })
 
-            console.log("📥 Prediction Response Status:", response.status)
+
 
             if (!response.ok) {
                 let errorMessage = `HTTP error ${response.status}`
                 try {
                     const errorData = await response.json()
-                    console.log("❌ Prediction Error Data:", errorData)
+
                     errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData)
                 } catch (parseError) {
-                    console.log("❌ Could not parse error response")
+
                     const errorText = await response.text()
-                    console.log("❌ Prediction Error Text:", errorText)
+
                     errorMessage = errorText || errorMessage
                 }
                 throw new Error(errorMessage)
             }
 
             const result = await response.json()
-            console.log("✅ Prediction Success:", result)
+
 
             // The API returns predicted_yield directly in tons/ha
             setPrediction({
@@ -248,7 +247,7 @@ export default function UserDashboard() {
                 fetchPredictionHistory()
             }
         } catch (err) {
-            console.error("💥 Prediction Error:", err)
+
             setError(`Error predicting yield: ${err.message}`)
         } finally {
             setIsSubmitting(false)
@@ -262,7 +261,7 @@ export default function UserDashboard() {
         setYieldSuccess("")
 
         try {
-            console.log("📤 Starting yield submission...")
+
 
             // Check if user is authenticated
             const token = getToken()
@@ -300,7 +299,6 @@ export default function UserDashboard() {
                 notes: yieldForm.notes || "",
             }
 
-            console.log("📦 Yield Payload:", payload)
 
             const response = await fetch(`${BACKEND_URL}/api/data/submit`, {
                 method: "POST",
@@ -308,25 +306,25 @@ export default function UserDashboard() {
                 body: JSON.stringify(payload),
             })
 
-            console.log("📥 Yield Response Status:", response.status)
+
 
             if (!response.ok) {
                 let errorMessage = `HTTP error ${response.status}`
                 try {
                     const errorData = await response.json()
-                    console.log("❌ Yield Error Data:", errorData)
+
                     errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData)
                 } catch (parseError) {
-                    console.log("❌ Could not parse error response")
+
                     const errorText = await response.text()
-                    console.log("❌ Yield Error Text:", errorText)
+
                     errorMessage = errorText || errorMessage
                 }
                 throw new Error(errorMessage)
             }
 
             const result = await response.json()
-            console.log("✅ Yield Success:", result)
+
 
             // Success - show message and reset form
             setYieldSuccess(result.message || "Yield data submitted successfully! Thank you for contributing.")
@@ -352,7 +350,7 @@ export default function UserDashboard() {
             }, 5000)
 
         } catch (err) {
-            console.error("💥 Yield Error:", err)
+
             const errorMessage = err.message || err.toString() || "Unknown error occurred"
             setYieldError(`Error submitting yield data: ${errorMessage}`)
         } finally {
@@ -430,7 +428,7 @@ export default function UserDashboard() {
                         <div className="flex items-center gap-3">
                             <div className="w-14 h-14 rounded-lg flex items-center justify-center overflow-hidden">
                                 <img
-                                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/smartgwizalogo-1PAtBScv6f0g56hdJZOC9kTecrK36y.png"
+                                    src="./smartgwizalogo.png"
                                     alt="SmartGwiza Logo"
                                     className="w-full h-full object-contain"
                                 />
@@ -508,7 +506,7 @@ export default function UserDashboard() {
                             Prediction History
                         </button>
 
-                        <a
+                        {/* <a
                             href="/dashboard/profile"
                             className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                         >
@@ -521,7 +519,7 @@ export default function UserDashboard() {
                                 />
                             </svg>
                             My Profile
-                        </a>
+                        </a> */}
                     </nav>
 
                     {/* Bottom Section */}
@@ -575,13 +573,13 @@ export default function UserDashboard() {
                             <div className="flex items-center gap-3">
                                 <div>
                                     <h1 className="text-xl font-bold text-slate-900">
-                                        {activeTab === "predict" ? "Crop Yield Prediction" :
+                                        {activeTab === "predict" ? "Maize Crop Yield Prediction" :
                                             activeTab === "feedback" ? "Submit Actual Yield" :
                                                 "Prediction History"}
                                     </h1>
                                     <p className="text-sm text-slate-500 mt-1">
                                         {activeTab === "predict"
-                                            ? "Get AI-powered predictions for your farm"
+                                            ? "Get AI-powered predictions for your Maize yield"
                                             : activeTab === "feedback"
                                                 ? "Help improve our model with your harvest data"
                                                 : "View your prediction history and insights"}
@@ -684,9 +682,9 @@ export default function UserDashboard() {
                                             style={{ borderColor: "rgba(89, 130, 22, 0.3)" }}
                                             onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
-                                            placeholder="e.g., 1200"
+                                            placeholder="enter value between 500-1400mm"
                                             min="500"
-                                            max="2000"
+                                            max="1400"
                                             step="0.1"
                                             required
                                         />
@@ -706,9 +704,9 @@ export default function UserDashboard() {
                                             style={{ borderColor: "rgba(89, 130, 22, 0.3)" }}
                                             onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
-                                            placeholder="e.g., 19.5"
-                                            min="15"
-                                            max="30"
+                                            placeholder="enter value between 18-21°C"
+                                            min="18"
+                                            max="21"
                                             step="0.1"
                                             required
                                         />
@@ -728,9 +726,9 @@ export default function UserDashboard() {
                                             style={{ borderColor: "rgau(89, 130, 22, 0.3)" }}
                                             onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
-                                            placeholder="e.g., 6.5"
-                                            min="0"
-                                            max="14"
+                                            placeholder="enter value between 6.0-7.0"
+                                            min="6.0"
+                                            max="7.0"
                                             step="0.1"
                                             required
                                         />
@@ -754,8 +752,9 @@ export default function UserDashboard() {
                                             style={{ borderColor: "rgba(89, 130, 22, 0.3)" }}
                                             onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
-                                            placeholder="e.g., 150"
-                                            min="0"
+                                            placeholder="enter value between 60-80kg/ha"
+                                            min="60"
+                                            max="80"
                                             step="0.1"
                                             required
                                         />
@@ -779,8 +778,9 @@ export default function UserDashboard() {
                                             style={{ borderColor: "rgba(89, 130, 22, 0.3)" }}
                                             onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
-                                            placeholder="e.g., 2.5"
-                                            min="0"
+                                            placeholder="enter value between 7-12l/ha"
+                                            min="7"
+                                            max="12"
                                             step="0.1"
                                             required
                                         />
@@ -923,7 +923,7 @@ export default function UserDashboard() {
                                             </div>
                                             <div className="mt-2">
                                                 <p className="text-sm text-gray-600">
-                                                    <span className="font-medium">Confidence: </span>
+                                                    <span className="font-medium">Category: </span>
                                                     <span className={`capitalize ${getConfidenceColor(prediction.confidence)}`}>
                                                         {prediction.confidence}
                                                     </span>
@@ -932,11 +932,7 @@ export default function UserDashboard() {
                                                     <span className="font-medium">Interpretation: </span>
                                                     {prediction.interpretation}
                                                 </p>
-                                                {prediction.prediction_id && (
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        Prediction ID: {prediction.prediction_id}
-                                                    </p>
-                                                )}
+                                               
                                             </div>
                                         </div>
                                         <button
@@ -1176,12 +1172,12 @@ export default function UserDashboard() {
 
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <div className="flex items-start gap-3">
-                                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                         </svg>
                                         <div>
-                                            <p className="text-sm font-medium text-blue-800">Fields marked with <span className="text-red-500">*</span> are required</p>
-                                            <p className="text-sm text-blue-700 mt-1">Your data helps improve the AI model for all farmers in Rwanda</p>
+
+                                            <p className="text-sm text-green-700 mt-1">Your data helps improve the SmartGwiza for better maize yield prediction in Rwanda</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1271,7 +1267,7 @@ export default function UserDashboard() {
                             )}
 
                             {/* Yield Trend Chart */}
-                            {predictionHistory.length > 0 && (
+                            {/* {predictionHistory.length > 0 && (
                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                     <h3 className="text-lg font-semibold text-slate-900 mb-4">Yield Prediction Trend</h3>
                                     <div className="h-64 flex items-end gap-2 pb-8 border-b border-slate-200">
@@ -1302,7 +1298,7 @@ export default function UserDashboard() {
                                         <p>Showing last {Math.min(predictionHistory.length, 10)} predictions</p>
                                     </div>
                                 </div>
-                            )}
+                            )} */}
 
                             {/* Prediction History Table */}
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -1362,7 +1358,7 @@ export default function UserDashboard() {
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date & Time</th>
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">District</th>
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Predicted Yield</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Confidence</th>
+                                                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Confidence</th> */}
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Irrigation</th>
                                                 </tr>
                                             </thead>
