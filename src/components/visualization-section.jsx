@@ -32,7 +32,7 @@ export default function VisualizationSection({ retrainResult }) {
           onMouseLeave={(e) => activeTab !== "trends" && (e.target.style.backgroundColor = "")}
         >
           <TrendingUp className="h-5 w-5" />
-          Yield Trends
+          Maize Yield Trends
         </button>
         <button
           onClick={() => setActiveTab("performance")}
