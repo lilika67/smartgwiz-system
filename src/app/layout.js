@@ -9,7 +9,7 @@ export const metadata = {
   description:
     "SmartGwiza helps Rwandan farmers predict maize yields using AI technology, access expert knowledge, and improve farming practices.",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.png",
     apple: "/smartgwizalogo.png",
   },
 }
