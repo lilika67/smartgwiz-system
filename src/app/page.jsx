@@ -436,7 +436,7 @@ export default function Home() {
               ></span>
               <span className="absolute inset-0 bg-[#598216] rounded-full blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-500"></span>
               <span className="relative z-10 flex items-center">
-                <span className="hidden md:inline">Predict Yield Now</span>
+                <span className="hidden md:inline">Predict Yield(national-level) </span>
                 <span className="md:hidden">Predict</span>
                 <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 transform group-hover:translate-x-1 transition-transform duration-300" />
               </span>
@@ -514,7 +514,7 @@ export default function Home() {
                     animation: "slideIn 0.5s ease-out 375ms both",
                   }}
                 >
-                  Predict Yield Now
+                  Predict Yield(national-level)
                 </button>
               </div>
             </nav>
@@ -551,11 +551,11 @@ export default function Home() {
               className={`flex flex-col sm:flex-row gap-4 justify-center transition-all duration-1000 delay-500 transform ${animateHero ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0"}`}
             >
               <button
-                onClick={() => setIsFormModalOpen(true)}
+                onClick={() => setIsLoginModalOpen(true)}
                 style={{ background: "linear-gradient(to right, #598216, #4a6f12)" }}
                 className="group flex items-center justify-center gap-2 px-8 py-4 hover:opacity-90 text-white rounded-full font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
               >
-                <span>Predict Yield</span>
+                <span>Predict yield(farmer-level)</span>
                 <ChevronRight className="h-4 w-4 ml-1 transition-transform duration-300 group-hover:translate-x-1" />
               </button>
             </div>
