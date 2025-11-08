@@ -660,9 +660,9 @@ export default function UserDashboard() {
                                             style={{ borderColor: "rgba(89, 130, 22, 0.3)" }}
                                             onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
-                                            placeholder="enter value between 500-1400mm"
-                                            min="500"
-                                            max="1400"
+                                            placeholder="enter value between 300-700mm"
+                                            min="300"
+                                            max="700"
                                             step="0.1"
                                             required
                                         />
@@ -682,9 +682,9 @@ export default function UserDashboard() {
                                             style={{ borderColor: "rgba(89, 130, 22, 0.3)" }}
                                             onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
-                                            placeholder="enter value between 18-21°C"
-                                            min="18"
-                                            max="21"
+                                            placeholder="enter value between 15-30°C"
+                                            min="15"
+                                            max="30"
                                             step="0.1"
                                             required
                                         />
@@ -704,9 +704,9 @@ export default function UserDashboard() {
                                             style={{ borderColor: "rgau(89, 130, 22, 0.3)" }}
                                             onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
-                                            placeholder="enter value between 6.0-7.0"
-                                            min="6.0"
-                                            max="7.0"
+                                            placeholder="enter value between 5.5-6.5"
+                                            min="5.5"
+                                            max="6.5"
                                             step="0.1"
                                             required
                                         />
@@ -996,8 +996,8 @@ export default function UserDashboard() {
                                             value={yieldForm.rainfall_mm}
                                             onChange={handleYieldInputChange}
                                             placeholder="e.g., 1200"
-                                            min="500"
-                                            max="2000"
+                                            min="300"
+                                            max="700"
                                             step="0.1"
                                             className="w-full px-4 py-2 border text-black border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                            
@@ -1032,8 +1032,8 @@ export default function UserDashboard() {
                                             value={yieldForm.soil_ph}
                                             onChange={handleYieldInputChange}
                                             placeholder="e.g., 6.5"
-                                            min="0"
-                                            max="14"
+                                            min="5.5"
+                                            max="6.5"
                                             step="0.1"
                                             className="w-full text-black px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                             

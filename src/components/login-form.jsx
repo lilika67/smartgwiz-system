@@ -70,6 +70,7 @@ export function LoginForm({ onSwitchToSignup }) {
     const [phoneError, setPhoneError] = useState("")
     const [loginError, setLoginError] = useState("")
     const [isLoading, setIsLoading] = useState(false)
+    const [loadingStage, setLoadingStage] = useState("")
     const [isClient, setIsClient] = useState(false)
     const router = useRouter()
 
@@ -79,7 +80,25 @@ export function LoginForm({ onSwitchToSignup }) {
     }, [])
 
     // Backend URL - use only one consistent URL
-    const BACKEND_URL =  "https://smartgwiza-be-1.onrender.com"
+    const BACKEND_URL = "https://smartgwiza-be-1.onrender.com"
+
+    // Check backend health
+    const checkBackendHealth = async () => {
+        try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+            const response = await fetch(`${BACKEND_URL}/health`, {
+                method: 'GET',
+                signal: controller.signal
+            })
+
+            clearTimeout(timeoutId)
+            return response.ok
+        } catch {
+            return false
+        }
+    }
 
     // IMPROVED: Validate Rwandan phone - accepts both 07... and 7... formats
     const validateRwandanPhone = (phone) => {
@@ -110,7 +129,6 @@ export function LoginForm({ onSwitchToSignup }) {
         return `+250${cleaned}` // Fallback
     }
 
-    
     const formatPhoneDisplay = (value) => {
         // Remove all non-digit characters
         const cleaned = value.replace(/\D/g, "")
@@ -149,24 +167,41 @@ export function LoginForm({ onSwitchToSignup }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+        const startTime = Date.now()
+        console.log("Login process started at:", startTime)
+
         setLoginError("")
         setPhoneError("")
         setIsLoading(true)
+        setLoadingStage("Validating credentials...")
 
         // Final validation
         if (!validateRwandanPhone(phoneNumber)) {
             setPhoneError("Please enter a valid Rwandan phone number")
             setIsLoading(false)
+            setLoadingStage("")
             return
         }
 
         if (!password) {
             setLoginError("Please enter your password")
             setIsLoading(false)
+            setLoadingStage("")
             return
         }
 
         try {
+            // Check backend health first
+            // setLoadingStage("Checking server connection...")
+            const isBackendHealthy = await checkBackendHealth()
+
+            if (!isBackendHealthy) {
+                setLoginError("Service is temporarily unavailable. Please try again in a moment.")
+                setIsLoading(false)
+                setLoadingStage("")
+                return
+            }
+
             const formattedPhone = formatPhoneForBackend(phoneNumber)
 
             const payload = {
@@ -174,11 +209,18 @@ export function LoginForm({ onSwitchToSignup }) {
                 password: password,
             }
 
-            console.log(" Sending login request:", {
+            console.log("Sending login request:", {
                 url: `${BACKEND_URL}/api/auth/login`,
                 phone_number: formattedPhone,
-                password_length: password.length
+                password_length: password.length,
+                time_elapsed: Date.now() - startTime + "ms"
             })
+
+            setLoadingStage("Authenticating...")
+
+            // Add timeout to the fetch request
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
 
             const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
                 method: "POST",
@@ -186,45 +228,62 @@ export function LoginForm({ onSwitchToSignup }) {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(payload),
+                signal: controller.signal
             })
 
+            clearTimeout(timeoutId)
+
+            console.log("Response received after:", Date.now() - startTime + "ms")
+
             const data = await response.json()
-            console.log(" Login response:", {
+            console.log("Login response:", {
                 status: response.status,
                 ok: response.ok,
                 role: data.role,
-                hasToken: !!data.access_token
+                hasToken: !!data.access_token,
+                total_time: Date.now() - startTime + "ms"
             })
 
             if (response.ok) {
-                // Store authentication data
-                storage.setItem("authToken", data.access_token)
-                storage.setItem("token", data.access_token)
-                storage.setItem("userRole", data.role)
-                storage.setItem("userFullname", data.fullname || "")
-                storage.setItem("userPhone", formattedPhone)
+                setLoadingStage("Setting up your session...")
 
-                console.log(" Login successful! Stored data:", {
-                    role: data.role,
-                    fullname: data.fullname,
-                    phone: formattedPhone
+                // Batch all storage operations for better performance
+                const storageData = {
+                    "authToken": data.access_token,
+                    "token": data.access_token,
+                    "userRole": data.role,
+                    "userFullname": data.fullname || "",
+                    "userPhone": formattedPhone
+                }
+
+                Object.entries(storageData).forEach(([key, value]) => {
+                    storage.setItem(key, value)
                 })
 
-                // Redirect based on role
+                console.log("Login successful! Stored data:", {
+                    role: data.role,
+                    fullname: data.fullname,
+                    phone: formattedPhone,
+                    total_time_before_redirect: Date.now() - startTime + "ms"
+                })
+
+                setLoadingStage("Redirecting...")
+
+                // Use window.location.href for immediate redirect instead of router.push()
                 if (data.role === "farmer") {
-                    console.log(" Redirecting to farmer dashboard...")
-                    router.push("/userdashboard")
+                    console.log("Redirecting to farmer dashboard...")
+                    window.location.href = "/userdashboard"
                 } else if (data.role === "admin") {
-                    console.log(" Redirecting to admin dashboard...")
-                    router.push("/admin")
+                    console.log("Redirecting to admin dashboard...")
+                    window.location.href = "/admin"
                 } else {
-                    console.log(" Redirecting to home...")
-                    router.push("/")
+                    console.log("Redirecting to home...")
+                    window.location.href = "/"
                 }
             } else {
                 // Handle different error formats from backend
                 const errorMessage = data.detail || data.message || "Login failed. Please check your credentials."
-              
+
                 setLoginError(errorMessage)
 
                 // Clear form on specific errors
@@ -233,10 +292,17 @@ export function LoginForm({ onSwitchToSignup }) {
                 }
             }
         } catch (err) {
-            console.error(" Login error:", err)
-            setLoginError(`Network error: ${err.message}. Please check your internet connection and try again.`)
+            console.error("Login error:", err)
+            console.error("Total time before error:", Date.now() - startTime + "ms")
+
+            if (err.name === 'AbortError') {
+                setLoginError("Request timeout. Please check your internet connection and try again.")
+            } else {
+                setLoginError(`Network error: ${err.message}. Please check your internet connection and try again.`)
+            }
         } finally {
             setIsLoading(false)
+            setLoadingStage("")
         }
     }
 
@@ -263,7 +329,6 @@ export function LoginForm({ onSwitchToSignup }) {
                 <div className="p-6 sm:p-8 md:p-12 flex flex-col justify-center">
                     <div className="mb-6 sm:mb-8">
                         <div className="flex items-center gap-3 mb-4">
-                            
                             <div>
                                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">SmartGwiza</h1>
                                 <p className="text-sm text-slate-500">Agricultural Intelligence Platform</p>
@@ -289,8 +354,8 @@ export function LoginForm({ onSwitchToSignup }) {
                                 onChange={handlePhoneInput}
                                 maxLength={13} // 0781 234 567 = 13 characters with spaces
                                 className={`w-full h-12 px-4 border text-black rounded-lg focus:outline-none focus:ring-2 transition-colors ${phoneError
-                                        ? "border-red-500 focus:ring-red-200"
-                                        : "border-gray-300 focus:border-green-500 focus:ring-green-200"
+                                    ? "border-red-500 focus:ring-red-200"
+                                    : "border-gray-300 focus:border-green-500 focus:ring-green-200"
                                     }`}
                                 required
                             />
@@ -354,7 +419,7 @@ export function LoginForm({ onSwitchToSignup }) {
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
-                                    Logging in...
+                                    {loadingStage || "Logging in..."}
                                 </>
                             ) : (
                                 "Log In"
