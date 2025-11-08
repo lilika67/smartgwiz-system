@@ -175,12 +175,16 @@ AI yield prediction uses machine learning algorithms to analyze multiple factors
 
 ### Step 1: Input Your Data
 Enter information about your farm:
-- Year of cultivation
+- District location of your farm
+- Fertilizer amount (kg/ha)
 - Pesticide usage (tonnes)
 - Average temperature (°C)
+- Rainfall (mm)
+- Soil pH
+- Irrigation type (Rainfed/Irrigated)
 
 ### Step 2: AI Analysis
-Our PyTorch-based model analyzes your inputs against:
+Our  model analyzes your inputs against:
 - Historical Rwanda maize data
 - Weather patterns
 - Agricultural best practices
