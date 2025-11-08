@@ -34,7 +34,7 @@ export default function VisualizationSection({ retrainResult }) {
           <TrendingUp className="h-5 w-5" />
           Maize Yield Trends
         </button>
-        <button
+        {/* <button
           onClick={() => setActiveTab("performance")}
           style={activeTab === "performance" ? { background: "linear-gradient(to right, #598216, #4a6f12)" } : {}}
           className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all duration-300 ${activeTab === "performance"
@@ -48,7 +48,7 @@ export default function VisualizationSection({ retrainResult }) {
         >
           <BarChart3 className="h-5 w-5" />
           Model Performance
-        </button>
+        </button> */}
         <button
           onClick={() => setActiveTab("insights")}
           style={activeTab === "insights" ? { background: "linear-gradient(to right, #598216, #4a6f12)" } : {}}
@@ -92,7 +92,7 @@ export default function VisualizationSection({ retrainResult }) {
           </div>
         )}
 
-        {activeTab === "performance" && (
+        {/* {activeTab === "performance" && (
           <div>
             <h3 className="text-2xl font-bold mb-6" style={{ color: "#598216" }}>
               Model Performance Metrics
@@ -133,12 +133,12 @@ export default function VisualizationSection({ retrainResult }) {
               </div>
             </div>
           </div>
-        )}
+        )} */}
 
         {activeTab === "insights" && (
           <div>
             <h3 className="text-2xl font-bold mb-6" style={{ color: "#598216" }}>
-              Key Insights
+              Key Insights for National level Maize Yield in Rwanda
             </h3>
             <div className="space-y-4">
               <div

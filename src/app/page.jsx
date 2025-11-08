@@ -427,14 +427,14 @@ export default function Home() {
               }}
             >
               <span
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
+                className="absolute inset-0 opacity-0  transition-opacity duration-700"
                 style={{
                   background: "linear-gradient(135deg, #6a9a1a 0%, #598216 50%, #6a9a1a 100%)",
                   backgroundSize: "200% 100%",
                   animation: "shimmer 2s ease-in-out infinite",
                 }}
               ></span>
-              <span className="absolute inset-0 bg-[#598216] rounded-full blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-500"></span>
+              <span className="absolute inset-0 bg-[#598216] rounded-full blur-xl opacity-0 transition-opacity duration-500"></span>
               <span className="relative z-10 flex items-center">
                 <span className="hidden md:inline">Predict Yield(national-level) </span>
                 <span className="md:hidden">Predict</span>
@@ -637,7 +637,7 @@ export default function Home() {
                 Input Your Data
               </h3>
               <p className="text-gray-600 dark:text-gray-300 text-center mb-6">
-                Enter the year, pesticide usage, and average temperature for your maize farm in Rwanda.
+                Enter your weather data,location and agricultural inputs for your maize farm in Rwanda.
               </p>
               <div className="mt-6 flex justify-center">
                 <button
@@ -667,7 +667,7 @@ export default function Home() {
                 AI Analysis
               </h3>
               <p className="text-gray-600 dark:text-gray-300 text-center mb-6">
-                Our PyTorch model analyzes your inputs against historical Rwanda maize data.
+                Our  model analyzes your inputs against historical Rwanda maize data.
               </p>
               <div className="mt-6 flex justify-center">
                 <button

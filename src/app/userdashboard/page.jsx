@@ -19,7 +19,7 @@ export default function UserDashboard() {
         soil_ph: "",
         fertilizer_used_kg_per_ha: "",
         pesticide_l_per_ha: "",
-        irrigation_type: "Rainfed",
+        irrigation_type: "",
     })
 
     const [yieldForm, setYieldForm] = useState({
@@ -29,11 +29,13 @@ export default function UserDashboard() {
         soil_ph: "",
         fertilizer_kg_per_ha: "",
         pesticide_l_per_ha: "",
-        irrigation_type: "Rainfed",
+        irrigation_type: "",
         actual_yield_tons_per_ha: "",
+        yield_before: "",
         planting_date: "",
         harvest_date: "",
         notes: "",
+        dataConsent: false,
     })
 
     const [prediction, setPrediction] = useState(null)
@@ -86,10 +88,10 @@ export default function UserDashboard() {
             try {
                 const rwandaDistricts = [
                     "Gasabo", "Nyarugenge", "Kicukiro",
-                     "Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana",
-                     "Burera", "Gakenke", "Gicumbi", "Musanze", "Rulindo",
-                     "Gisagara", "Huye", "Kamonyi", "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango",
-                     "Karongi", "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rusizi", "Rutsiro"
+                    "Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana",
+                    "Burera", "Gakenke", "Gicumbi", "Musanze", "Rulindo",
+                    "Gisagara", "Huye", "Kamonyi", "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango",
+                    "Karongi", "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rusizi", "Rutsiro"
                 ]
                 setDistricts(rwandaDistricts.sort())
             } catch (error) {
@@ -134,7 +136,6 @@ export default function UserDashboard() {
 
             const historyData = await response.json()
 
-
             // Handle both array and object response formats
             if (Array.isArray(historyData)) {
                 setPredictionHistory(historyData)
@@ -146,7 +147,6 @@ export default function UserDashboard() {
                 setPredictionHistory([])
             }
         } catch (err) {
-
             setHistoryError(`Failed to load prediction history: ${err.message}`)
         } finally {
             setLoadingHistory(false)
@@ -166,8 +166,11 @@ export default function UserDashboard() {
     }
 
     const handleYieldInputChange = (e) => {
-        const { name, value } = e.target
-        setYieldForm((prev) => ({ ...prev, [name]: value }))
+        const { name, value, type, checked } = e.target
+        setYieldForm((prev) => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }))
     }
 
     const handlePredictionSubmit = async (e) => {
@@ -177,7 +180,6 @@ export default function UserDashboard() {
         setPrediction(null)
 
         try {
-
             // Check if user is authenticated
             const token = getToken()
             if (!token) {
@@ -205,33 +207,25 @@ export default function UserDashboard() {
                 irrigation_type: formData.irrigation_type,
             }
 
-            
-
             const response = await fetch(`${BACKEND_URL}/api/predict`, {
                 method: "POST",
                 headers: getAuthHeaders(),
                 body: JSON.stringify(payload),
             })
 
-
-
             if (!response.ok) {
                 let errorMessage = `HTTP error ${response.status}`
                 try {
                     const errorData = await response.json()
-
                     errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData)
                 } catch (parseError) {
-
                     const errorText = await response.text()
-
                     errorMessage = errorText || errorMessage
                 }
                 throw new Error(errorMessage)
             }
 
             const result = await response.json()
-
 
             // The API returns predicted_yield directly in tons/ha
             setPrediction({
@@ -247,7 +241,6 @@ export default function UserDashboard() {
                 fetchPredictionHistory()
             }
         } catch (err) {
-
             setError(`Error predicting yield: ${err.message}`)
         } finally {
             setIsSubmitting(false)
@@ -261,8 +254,6 @@ export default function UserDashboard() {
         setYieldSuccess("")
 
         try {
-
-
             // Check if user is authenticated
             const token = getToken()
             if (!token) {
@@ -284,7 +275,14 @@ export default function UserDashboard() {
                 return
             }
 
-            // Prepare payload matching API requirements
+            // Check data consent (frontend-only validation)
+            if (!yieldForm.dataConsent) {
+                setYieldError("Please agree to allow SmartGwiza to use your data for model improvement")
+                setIsSubmitting(false)
+                return
+            }
+
+            // Prepare payload matching API requirements (exclude dataConsent from backend payload)
             const payload = {
                 district: yieldForm.district,
                 rainfall_mm: Number.parseFloat(yieldForm.rainfall_mm),
@@ -294,11 +292,11 @@ export default function UserDashboard() {
                 pesticide_l_per_ha: yieldForm.pesticide_l_per_ha ? Number.parseFloat(yieldForm.pesticide_l_per_ha) : 0,
                 irrigation_type: yieldForm.irrigation_type,
                 actual_yield_tons_per_ha: Number.parseFloat(yieldForm.actual_yield_tons_per_ha),
+                yield_before: yieldForm.yield_before ? Number.parseFloat(yieldForm.yield_before) : 0,
                 planting_date: yieldForm.planting_date || "",
                 harvest_date: yieldForm.harvest_date || "",
                 notes: yieldForm.notes || "",
             }
-
 
             const response = await fetch(`${BACKEND_URL}/api/data/submit`, {
                 method: "POST",
@@ -306,25 +304,19 @@ export default function UserDashboard() {
                 body: JSON.stringify(payload),
             })
 
-
-
             if (!response.ok) {
                 let errorMessage = `HTTP error ${response.status}`
                 try {
                     const errorData = await response.json()
-
                     errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData)
                 } catch (parseError) {
-
                     const errorText = await response.text()
-
                     errorMessage = errorText || errorMessage
                 }
                 throw new Error(errorMessage)
             }
 
             const result = await response.json()
-
 
             // Success - show message and reset form
             setYieldSuccess(result.message || "Yield data submitted successfully! Thank you for contributing.")
@@ -337,11 +329,13 @@ export default function UserDashboard() {
                 soil_ph: "",
                 fertilizer_kg_per_ha: "",
                 pesticide_l_per_ha: "",
-                irrigation_type: "Rainfed",
+                irrigation_type: "",
                 actual_yield_tons_per_ha: "",
+                yield_before: "",
                 planting_date: "",
                 harvest_date: "",
                 notes: "",
+                dataConsent: false,
             })
 
             // Clear success message after 5 seconds
@@ -350,7 +344,6 @@ export default function UserDashboard() {
             }, 5000)
 
         } catch (err) {
-
             const errorMessage = err.message || err.toString() || "Unknown error occurred"
             setYieldError(`Error submitting yield data: ${errorMessage}`)
         } finally {
@@ -428,8 +421,8 @@ export default function UserDashboard() {
                         <div className="flex items-center gap-3">
                             <div className="w-14 h-14 rounded-lg flex items-center justify-center overflow-hidden">
                                 <img
-                                    src="./smartgwizalogo.png"
-                                    alt="SmartGwiza Logo"
+                                    src="/images/smartgwizalogo.png"
+                                    alt="logo"
                                     className="w-full h-full object-contain"
                                 />
                             </div>
@@ -505,21 +498,6 @@ export default function UserDashboard() {
                             </svg>
                             Prediction History
                         </button>
-
-                        {/* <a
-                            href="/dashboard/profile"
-                            className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                                />
-                            </svg>
-                            My Profile
-                        </a> */}
                     </nav>
 
                     {/* Bottom Section */}
@@ -641,7 +619,7 @@ export default function UserDashboard() {
                                     </div>
 
                                     <div>
-                                        <label htmlFor="district-input" className="block text-sm font-medium mb-2" style={{ color: "#598216" }}>
+                                        <label htmlFor="district-input" className="blocktext-sm font-medium mb-2" style={{ color: "#598216" }}>
                                             District *
                                         </label>
                                         <select
@@ -655,7 +633,7 @@ export default function UserDashboard() {
                                             onBlur={(e) => (e.target.style.borderColor = "rgba(89, 130, 22, 0.3)")}
                                             required
                                         >
-                                            <option value="">Select District</option>
+                                            <option className="text-black"  disabled value="">Select District</option>
                                             {loadingDistricts ? (
                                                 <option disabled>Loading districts...</option>
                                             ) : (
@@ -932,7 +910,7 @@ export default function UserDashboard() {
                                                     <span className="font-medium">Interpretation: </span>
                                                     {prediction.interpretation}
                                                 </p>
-                                               
+
                                             </div>
                                         </div>
                                         <button
@@ -1009,8 +987,8 @@ export default function UserDashboard() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Rainfall (mm) <span className="text-red-500">*</span>
+                                        <label className="block text-sm font-medium text-black mb-2">
+                                            Rainfall (mm) 
                                         </label>
                                         <input
                                             type="number"
@@ -1021,14 +999,14 @@ export default function UserDashboard() {
                                             min="500"
                                             max="2000"
                                             step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                                            required
+                                            className="w-full px-4 py-2 border text-black border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                           
                                         />
                                     </div>
 
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Temperature (°C) <span className="text-red-500">*</span>
+                                            Temperature (°C) 
                                         </label>
                                         <input
                                             type="number"
@@ -1039,14 +1017,14 @@ export default function UserDashboard() {
                                             min="15"
                                             max="30"
                                             step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                                            required
+                                            className="w-full px-4 py-2 text-black border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                          
                                         />
                                     </div>
 
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Soil pH <span className="text-red-500">*</span>
+                                            Soil pH 
                                         </label>
                                         <input
                                             type="number"
@@ -1057,21 +1035,21 @@ export default function UserDashboard() {
                                             min="0"
                                             max="14"
                                             step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                                            required
+                                            className="w-full text-black px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                            
                                         />
                                     </div>
 
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Irrigation Type <span className="text-red-500">*</span>
+                                            Irrigation Type 
                                         </label>
                                         <select
                                             name="irrigation_type"
                                             value={yieldForm.irrigation_type}
                                             onChange={handleYieldInputChange}
                                             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
-                                            required
+                                            
                                         >
                                             <option value="Rainfed">Rainfed</option>
                                             <option value="Irrigated">Irrigated</option>
@@ -1091,15 +1069,33 @@ export default function UserDashboard() {
                                             placeholder="e.g., 1.501"
                                             min="0"
                                             step="0.001"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                            className="w-full text-black px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                             required
+                                        />
+                                    </div>
+
+                                    {/* New Yield Before Field */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Previous Season Yield (tons/ha) 
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.001"
+                                            name="yield_before"
+                                            value={yieldForm.yield_before}
+                                            onChange={handleYieldInputChange}
+                                            placeholder="e.g., 1.200"
+                                            min="0"
+                                            step="0.001"
+                                            className="w-full text-black px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                         />
                                     </div>
 
                                     {/* Optional Fields */}
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Fertilizer Used (kg/ha) <span className="text-gray-400 text-xs">(Optional)</span>
+                                            Fertilizer Used (kg/ha)
                                         </label>
                                         <input
                                             type="number"
@@ -1109,13 +1105,13 @@ export default function UserDashboard() {
                                             placeholder="e.g., 150"
                                             min="0"
                                             step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                            className="w-full text-black px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                         />
                                     </div>
 
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Pesticide Used (L/ha) <span className="text-gray-400 text-xs">(Optional)</span>
+                                            Pesticide Used (L/ha) 
                                         </label>
                                         <input
                                             type="number"
@@ -1125,7 +1121,7 @@ export default function UserDashboard() {
                                             placeholder="e.g., 2.5"
                                             min="0"
                                             step="0.1"
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                            className="w-full text-black px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                         />
                                     </div>
 
@@ -1138,7 +1134,7 @@ export default function UserDashboard() {
                                             name="planting_date"
                                             value={yieldForm.planting_date}
                                             onChange={handleYieldInputChange}
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                            className="w-full text-black px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                         />
                                     </div>
 
@@ -1151,7 +1147,7 @@ export default function UserDashboard() {
                                             name="harvest_date"
                                             value={yieldForm.harvest_date}
                                             onChange={handleYieldInputChange}
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                                            className="w-full px-4 py-2 border text-black border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
                                         />
                                     </div>
 
@@ -1165,27 +1161,43 @@ export default function UserDashboard() {
                                             onChange={handleYieldInputChange}
                                             placeholder="Any challenges faced, weather conditions, or other observations..."
                                             rows={4}
-                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none resize-none transition-colors"
+                                            className="w-full px-4 text-black py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none resize-none transition-colors"
                                         />
                                     </div>
                                 </div>
 
+                                {/* Data Usage Consent Checkbox - Frontend Only */}
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <div className="flex items-start gap-3">
                                         <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                         </svg>
                                         <div>
-
-                                            <p className="text-sm text-green-700 mt-1">Your data helps improve the SmartGwiza for better maize yield prediction in Rwanda</p>
+                                            <h4 className="text-sm font-medium text-green-900">Data Usage Consent</h4>
+                                            <p className="text-sm text-green-700 mt-1">Your data helps improve the SmartGwiza AI model for better maize yield prediction in Rwanda. By checking this box, you agree to share your data for model improvement purposes.</p>
                                         </div>
                                     </div>
                                 </div>
 
+                                <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <input
+                                        type="checkbox"
+                                        id="data-consent"
+                                        name="dataConsent"
+                                        checked={yieldForm.dataConsent || false}
+                                        onChange={handleYieldInputChange}
+                                        className="mt-1 w-4 h-4 text-green-600 bg-white border-slate-300 rounded focus:ring-green-500 focus:ring-2"
+                                        required
+                                    />
+                                    <label htmlFor="data-consent" className="text-sm text-slate-700">
+                                        I agree to allow SmartGwiza to use my submitted data to improve the AI model performance and accuracy for maize yield prediction in Rwanda. *
+                                    </label>
+                                </div>
+
                                 <button
                                     type="submit"
-                                    disabled={isSubmitting}
-                                    className="w-full py-3 px-6 text-white font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                                    disabled={isSubmitting || !yieldForm.dataConsent}
+                                    className="w-full py-3 px-6 text-white font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                                     style={{ backgroundColor: "#598216" }}
                                 >
                                     {isSubmitting ? (
@@ -1266,40 +1278,6 @@ export default function UserDashboard() {
                                 </div>
                             )}
 
-                            {/* Yield Trend Chart */}
-                            {/* {predictionHistory.length > 0 && (
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Yield Prediction Trend</h3>
-                                    <div className="h-64 flex items-end gap-2 pb-8 border-b border-slate-200">
-                                        {predictionHistory.slice(0, 10).map((prediction, index) => {
-                                            const yieldValue = prediction.predicted_yield || prediction.yield || 0
-                                            const maxYield = Math.max(...predictionHistory.slice(0, 10).map(p => p.predicted_yield || p.yield || 0))
-                                            const height = maxYield > 0 ? (yieldValue / maxYield) * 80 : 0
-
-                                            return (
-                                                <div key={prediction.id || index} className="flex-1 flex flex-col items-center">
-                                                    <div
-                                                        className="w-full rounded-t transition-all hover:opacity-80"
-                                                        style={{
-                                                            height: `${height}%`,
-                                                            backgroundColor: "#598216",
-                                                            minHeight: '20px'
-                                                        }}
-                                                        title={`${yieldValue.toFixed(2)} tons/ha`}
-                                                    ></div>
-                                                    <div className="text-xs text-slate-500 mt-2 text-center">
-                                                        {prediction.district?.substring(0, 3)}
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                    <div className="mt-4 text-sm text-slate-600">
-                                        <p>Showing last {Math.min(predictionHistory.length, 10)} predictions</p>
-                                    </div>
-                                </div>
-                            )} */}
-
                             {/* Prediction History Table */}
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                 <div className="p-6 border-b border-slate-200">
@@ -1358,7 +1336,7 @@ export default function UserDashboard() {
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date & Time</th>
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">District</th>
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Predicted Yield</th>
-                                                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Confidence</th> */}
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Confidence</th>
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Irrigation</th>
                                                 </tr>
                                             </thead>
@@ -1369,18 +1347,18 @@ export default function UserDashboard() {
                                                             {formatDate(prediction.timestamp || prediction.created_at)}
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                                                            {prediction.district || 'N/A'}
+                                                            {prediction.inputs.district || 'N/A'}
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                                                             {(prediction.predicted_yield || prediction.yield || 0).toFixed(2)} tons/ha
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getConfidenceColor(prediction.confidence)}`}>
-                                                                {prediction.confidence || 'medium'}
+                                                                {prediction.interpretation.confidence}
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                                                            {prediction.irrigation_type || 'Rainfed'}
+                                                            {prediction.inputs.irrigation_type || 'N/A'}
                                                         </td>
                                                     </tr>
                                                 ))}

@@ -38,11 +38,46 @@ const EyeOffIcon = () => (
     </svg>
 )
 
+// List of Rwandan districts
+const rwandanDistricts = [
+    "Gasabo",
+    "Kicukiro",
+    "Nyarugenge",
+    "Bugesera",
+    "Gatsibo",
+    "Kayonza",
+    "Kirehe",
+    "Ngoma",
+    "Nyagatare",
+    "Rwamagana",
+    "Burera",
+    "Gakenke",
+    "Gicumbi",
+    "Musanze",
+    "Rulindo",
+    "Gisagara",
+    "Huye",
+    "Kamonyi",
+    "Muhanga",
+    "Nyamagabe",
+    "Nyanza",
+    "Nyaruguru",
+    "Karongi",
+    "Ngororero",
+    "Nyabihu",
+    "Nyamasheke",
+    "Rubavu",
+    "Rusizi",
+    "Rutsiro"
+];
+
 export function SignupForm({ onSwitchToLogin }) {
-    const [fullName, setFullName] = useState("")
+    const [fullname, setFullname] = useState("")
     const [phoneNumber, setPhoneNumber] = useState("")
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
+    const [role, setRole] = useState("farmer")
+    const [district, setDistrict] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [phoneError, setPhoneError] = useState("")
@@ -109,14 +144,21 @@ export function SignupForm({ onSwitchToLogin }) {
             return
         }
 
+        if (!district) {
+            setSignupError("Please select your district")
+            return
+        }
+
         try {
             const payload = {
-                full_name: fullName,
+                fullname: fullname,
                 phone_number: phoneNumber.replace(/\s/g, ""),
                 password: password,
+                role: role,
+                district: district
             }
 
-            const response = await fetch("http://localhost:8000/api/auth/signup", {
+            const response = await fetch("https://smartgwiza-be-1.onrender.com/api/auth/signup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -153,16 +195,16 @@ export function SignupForm({ onSwitchToLogin }) {
 
                     <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
                         <div className="space-y-2">
-                            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="fullname" className="block text-sm font-medium text-gray-700">
                                 Full Name
                             </label>
                             <input
-                                id="fullName"
+                                id="fullname"
                                 type="text"
                                 placeholder="Enter your full name"
-                                value={fullName}
-                                onChange={(e) => setFullName(e.target.value)}
-                                className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                                value={fullname}
+                                onChange={(e) => setFullname(e.target.value)}
+                                className="w-full h-12 px-4 border text-black border-gray-300 rounded-lg focus:outline-none focus:ring-2"
                                 onFocus={(e) => (e.target.style.borderColor = "#598216")}
                                 onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
                                 required
@@ -185,6 +227,48 @@ export function SignupForm({ onSwitchToLogin }) {
                                 required
                             />
                             {phoneError && <p className="text-xs text-red-500">{phoneError}</p>}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                                    Role
+                                </label>
+                                <select
+                                    id="role"
+                                    value={role}
+                                    onChange={(e) => setRole(e.target.value)}
+                                    className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 text-black"
+                                    onFocus={(e) => (e.target.style.borderColor = "#598216")}
+                                    onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
+                                    required
+                                >
+                                    <option value="farmer">Farmer</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label htmlFor="district" className="block text-sm font-medium text-gray-700">
+                                    District
+                                </label>
+                                <select
+                                    id="district"
+                                    value={district}
+                                    onChange={(e) => setDistrict(e.target.value)}
+                                    className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 text-black"
+                                    onFocus={(e) => (e.target.style.borderColor = "#598216")}
+                                    onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
+                                    required
+                                >
+                                    <option value="">Select District</option>
+                                    {rwandanDistricts.map((district) => (
+                                        <option key={district} value={district}>
+                                            {district}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -273,7 +357,7 @@ export function SignupForm({ onSwitchToLogin }) {
                 >
                     <div className="absolute inset-0 flex items-center justify-center p-8">
                         <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
-                            <Image src="/images/fam.jpg" alt="Farmer in field" fill className="object-cover" priority />
+                            <Image src="/images/farmer1.jpg" alt="Farmer in field" fill className="object-cover" priority />
                         </div>
                     </div>
                 </div>

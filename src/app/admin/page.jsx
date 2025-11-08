@@ -426,7 +426,7 @@ export default function AdminDashboard() {
             setPlatformImpactStats(comparisonData.stats)
 
         } catch (err) {
-            console.error('❌ Fetch yield comparison error:', err)
+            console.error(' Fetch yield comparison error:', err)
         } finally {
             setLoadingComparison(false)
         }
@@ -502,7 +502,7 @@ export default function AdminDashboard() {
 
         setLoadingStats(true)
         try {
-            console.log("📊 Fetching stats from:", `${BACKEND_URL}/api/admin/stats`)
+            console.log(" Fetching stats from:", `${BACKEND_URL}/api/admin/stats`)
 
             const response = await fetch(`${BACKEND_URL}/api/admin/stats`, {
                 method: "GET",
@@ -514,12 +514,12 @@ export default function AdminDashboard() {
             }
 
             const data = await response.json()
-            console.log("📊 Stats data received:", data)
+            console.log(" Stats data received:", data)
 
             setStats(data)
 
         } catch (err) {
-            console.error('❌ Fetch stats error:', err)
+            console.error(' Fetch stats error:', err)
             // Set default stats to prevent UI breaking
             setStats({
                 total_farmers: 0,
@@ -913,8 +913,12 @@ export default function AdminDashboard() {
             <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
                 <div className="p-6 border-b border-green-200">
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-[#598216] to-[#4a6d12] rounded-xl flex items-center justify-center text-white font-bold text-xl">
-                            SG
+                        <div className="w-14 h-14 rounded-lg flex items-center justify-center overflow-hidden">
+                            <img
+                                src="/images/smartgwizalogo.png"
+                                alt="logo"
+                                className="w-full h-full object-contain"
+                            />
                         </div>
                         <div>
                             <h1 className="text-xl font-bold text-[#598216]">SmartGwiza</h1>
