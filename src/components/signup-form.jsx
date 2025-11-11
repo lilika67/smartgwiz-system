@@ -244,7 +244,7 @@ export function SignupForm({ onSwitchToLogin }) {
                                     required
                                 >
                                     <option value="farmer">Farmer</option>
-                                    <option value="admin">Admin</option>
+                                    {/* <option value="admin">Admin</option> */}
                                 </select>
                             </div>
 
