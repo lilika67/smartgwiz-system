@@ -4,6 +4,9 @@ import { useState, useEffect } from "react"
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts'
 import { format, subDays, parseISO, isValid } from 'date-fns'
 import { useRouter } from "next/navigation"
+import PredictionForm from "../../components/farmer-prediction-form"
+import NationalPredictionForm from "../../components/prediction-form"
+import { downloadSubmissionsCSV, downloadSubmissionsStatsCSV } from "../../../lib/submissionExport"
 
 // Professional Icons Component
 const Icons = {
@@ -188,7 +191,7 @@ const CustomTooltip = ({ active, payload, label }) => {
                     </div>
                     <div className="flex items-center justify-between gap-4">
                         <span className="text-xs text-gray-600">Submissions:</span>
-                        <span className="font-bold text-blue-600 text-sm">{data.submission_count}</span>
+                        <span className="font-bold text-[#455E14] text-sm">{data.submission_count}</span>
                     </div>
                 </div>
             </div>
@@ -222,7 +225,7 @@ const YieldComparisonTooltip = ({ active, payload, label }) => {
                     {data.district && (
                         <div className="flex items-center justify-between gap-4">
                             <span className="text-xs text-gray-600">District:</span>
-                            <span className="font-bold text-blue-600 text-sm">{data.district}</span>
+                            <span className="font-bold text-[#455E14] text-sm">{data.district}</span>
                         </div>
                     )}
                 </div>
@@ -316,6 +319,18 @@ export default function AdminDashboard() {
     const [platformImpactStats, setPlatformImpactStats] = useState(null)
     const [loadingComparison, setLoadingComparison] = useState(false)
     const [initialLoadComplete, setInitialLoadComplete] = useState(false)
+
+    // Prediction form states
+    const [predictionResult, setPredictionResult] = useState(null)
+    const [predictionError, setPredictionError] = useState("")
+    const [isSubmittingPrediction, setIsSubmittingPrediction] = useState(false)
+    const [districts, setDistricts] = useState([])
+    const [loadingDistricts, setLoadingDistricts] = useState(false)
+
+    // National prediction form states
+    const [isNationalPredictionOpen, setIsNationalPredictionOpen] = useState(false)
+    const [nationalPredictionResult, setNationalPredictionResult] = useState(null)
+
     const router = useRouter()
 
     // Get auth headers
@@ -340,6 +355,59 @@ export default function AdminDashboard() {
         }
         return null
     }
+
+    // CSV Export for farmers
+    const downloadCSV = () => {
+        const headers = ["Name", "Phone", "Email", "Location", "Yield (t/ha)", "Status", "Last Updated"]
+        const rows = filteredFarmers.map(f => [
+            f.name || f.fullname || 'N/A',
+            f.phone || f.phone_number || 'N/A',
+            f.email || 'N/A',
+            f.location || f.district || 'N/A',
+            f.latest_yield || 'N/A',
+            f.status || (f.is_active ? 'Active' : 'Inactive'),
+            safeFormatDate(f.lastPrediction || f.updated_at || f.created_at, 'yyyy-MM-dd HH:mm')
+        ])
+        const csv = [headers, ...rows].map(r => r.map(field => `"${field}"`).join(",")).join("\n")
+        const blob = new Blob([csv], { type: "text/csv" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `smartgwiza-farmers-${format(new Date(), 'yyyy-MM-dd')}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+    }
+
+    // Fetch Rwanda districts
+    useEffect(() => {
+        const fetchDistricts = async () => {
+            setLoadingDistricts(true)
+            try {
+                const rwandaDistricts = [
+                    "Gasabo", "Nyarugenge", "Kicukiro",
+                    "Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana",
+                    "Burera", "Gakenke", "Gicumbi", "Musanze", "Rulindo",
+                    "Gisagara", "Huye", "Kamonyi", "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango",
+                    "Karongi", "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rusizi", "Rutsiro"
+                ]
+                setDistricts(rwandaDistricts.sort())
+            } catch (error) {
+                console.error("Error fetching districts:", error)
+                const fallbackDistricts = [
+                    "Kigali City", "Gasabo", "Nyarugenge", "Kicukiro",
+                    "Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana",
+                    "Burera", "Gakenke", "Gicumbi", "Musanze", "Rulindo",
+                    "Gisagara", "Huye", "Kamonyi", "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango",
+                    "Karongi", "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rusizi", "Rutsiro"
+                ]
+                setDistricts(fallbackDistricts.sort())
+            } finally {
+                setLoadingDistricts(false)
+            }
+        }
+
+        fetchDistricts()
+    }, [])
 
     // New function to fetch all data at once
     const fetchAllData = async () => {
@@ -657,7 +725,7 @@ export default function AdminDashboard() {
                 .map(submission => ({
                     ...submission,
                     created_at: submission.created_at || submission.timestamp || submission.submitted_at || new Date().toISOString(),
-                    user_name: submission.user_name || submission.fullname || "Unknown Farmer",
+                    user_name: submission.user_name,
                     district: submission.district || "Unknown District",
                     phone: submission.phone || submission.phone_number || "N/A"
                 }))
@@ -665,7 +733,7 @@ export default function AdminDashboard() {
             setRecentSubmissions(submissions)
 
         } catch (err) {
-            console.error('❌ Fetch recent submissions error:', err)
+            console.error(' Fetch recent submissions error:', err)
         } finally {
             setLoadingSubmissions(false)
         }
@@ -684,6 +752,97 @@ export default function AdminDashboard() {
             max_yield: Number(trend.max_yield) || 0,
             safeDate: safeParseTrendDate(trend.date)
         })).sort((a, b) => a.safeDate - b.safeDate)
+    }
+
+    // Add prediction submission handler for admin
+    const handleAdminPredictionSubmit = async (formData) => {
+        setIsSubmittingPrediction(true)
+        setPredictionError("")
+        setPredictionResult(null)
+
+        try {
+            const token = authToken || getToken()
+            if (!token) {
+                setPredictionError("Authentication required")
+                setIsSubmittingPrediction(false)
+                return
+            }
+
+            // Validate required fields
+            if (!formData.district || !formData.rainfall_mm || !formData.temperature_c ||
+                !formData.soil_ph || !formData.fertilizer_used_kg_per_ha || !formData.pesticide_l_per_ha) {
+                setPredictionError("Please fill in all required fields")
+                setIsSubmittingPrediction(false)
+                return
+            }
+
+            // Prepare payload matching API requirements
+            const payload = {
+                district: formData.district,
+                rainfall_mm: Number.parseFloat(formData.rainfall_mm),
+                temperature_c: Number.parseFloat(formData.temperature_c),
+                soil_ph: Number.parseFloat(formData.soil_ph),
+                fertilizer_used_kg_per_ha: Number.parseFloat(formData.fertilizer_used_kg_per_ha),
+                pesticide_l_per_ha: Number.parseFloat(formData.pesticide_l_per_ha),
+                irrigation_type: formData.irrigation_type,
+            }
+
+            const response = await fetch(`${BACKEND_URL}/api/predict`, {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify(payload),
+            })
+
+            if (!response.ok) {
+                let errorMessage = `HTTP error ${response.status}`
+                try {
+                    const errorData = await response.json()
+                    errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData)
+                } catch (parseError) {
+                    const errorText = await response.text()
+                    errorMessage = errorText || errorMessage
+                }
+                throw new Error(errorMessage)
+            }
+
+            const result = await response.json()
+
+            setPredictionResult({
+                predicted_yield: result.predicted_yield,
+                confidence: result.confidence,
+                interpretation: result.interpretation,
+                prediction_id: result.prediction_id,
+                timestamp: result.timestamp
+            })
+
+        } catch (err) {
+            setPredictionError(`Error predicting yield: ${err.message}`)
+        } finally {
+            setIsSubmittingPrediction(false)
+        }
+    }
+
+    const handleNewPrediction = () => {
+        setPredictionResult(null)
+        setPredictionError("")
+    }
+
+    // Add handler for national prediction success
+    const handleNationalPredictionSuccess = (prediction) => {
+        setNationalPredictionResult(prediction)
+        console.log("National prediction successful:", prediction)
+
+        // Show success notification
+        const successNotification = document.createElement("div")
+        successNotification.className = "fixed top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 z-50"
+        successNotification.innerHTML = `
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            National prediction completed: ${prediction.value} tons/ha (${prediction.category})
+        `
+        document.body.appendChild(successNotification)
+        setTimeout(() => document.body.removeChild(successNotification), 5000)
     }
 
     // Calculate yield distribution for pie chart
@@ -791,6 +950,8 @@ export default function AdminDashboard() {
         } else if (tabId === "analytics") {
             fetchStats()
             fetchYieldComparisonData()
+        } else if (tabId === "predictions") {
+            // You can fetch prediction history or other prediction-related data here if needed
         }
     }
 
@@ -802,8 +963,7 @@ export default function AdminDashboard() {
             farmer.phone?.includes(searchTerm) ||
             farmer.phone_number?.includes(searchTerm) ||
             farmer.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            farmer.district?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            farmer.email?.toLowerCase().includes(searchTerm.toLowerCase())
+            farmer.district?.toLowerCase().includes(searchTerm.toLowerCase())
 
         const matchesStatus = filterStatus === "All" || farmer.status === filterStatus
         return matchesSearch && matchesStatus
@@ -841,51 +1001,19 @@ export default function AdminDashboard() {
         }).length
     }
 
-    // CSV Export for farmers
-    const downloadCSV = () => {
-        const headers = ["Name", "Phone", "Email", "Location", "Yield (t/ha)", "Status", "Last Updated"]
-        const rows = filteredFarmers.map(f => [
-            f.name || f.fullname || 'N/A',
-            f.phone || f.phone_number || 'N/A',
-            f.email || 'N/A',
-            f.location || f.district || 'N/A',
-            f.latest_yield || 'N/A',
-            f.status || (f.is_active ? 'Active' : 'Inactive'),
-            safeFormatDate(f.lastPrediction || f.updated_at || f.created_at, 'yyyy-MM-dd HH:mm')
-        ])
-        const csv = [headers, ...rows].map(r => r.map(field => `"${field}"`).join(",")).join("\n")
-        const blob = new Blob([csv], { type: "text/csv" })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `smartgwiza-farmers-${format(new Date(), 'yyyy-MM-dd')}.csv`
-        a.click()
-        URL.revokeObjectURL(url)
-    }
-
     const yieldDistribution = calculateYieldDistribution();
     const yieldStats = calculateYieldStats();
 
     // Don't render until client-side
-    if (!isClient) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-                <div className="animate-pulse text-[#598216]">Loading dashboard...</div>
-            </div>
-        )
-    }
+    // if (!isClient) {
+    //     return (
+    //         <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
+    //             <div className="animate-pulse text-[#598216]">Loading dashboard...</div>
+    //         </div>
+    //     )
+    // }
 
-    // Show loading/error state
-    if (loading && !initialLoadComplete) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-[#598216] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-[#598216]">Loading admin dashboard...</p>
-                </div>
-            </div>
-        )
-    }
+   
 
     if (error && !authToken) {
         return (
@@ -931,6 +1059,7 @@ export default function AdminDashboard() {
                         { id: "overview", label: "Dashboard Overview", icon: Icons.Dashboard },
                         { id: "farmers", label: "Farmers Management", icon: Icons.Farmers },
                         { id: "submissions", label: "Submissions", icon: Icons.Submissions },
+                        { id: "predictions", label: "Yield Predictions", icon: Icons.Prediction },
                         { id: "analytics", label: "Analytics", icon: Icons.Analytics },
                     ].map(item => (
                         <button
@@ -977,13 +1106,15 @@ export default function AdminDashboard() {
                                 {activeTab === "overview" ? "Dashboard Overview" :
                                     activeTab === "farmers" ? "Farmers Management" :
                                         activeTab === "submissions" ? "Submissions Management" :
-                                            "Analytics & Reports"}
+                                            activeTab === "predictions" ? "Yield Predictions" :
+                                                "Analytics & Reports"}
                             </h1>
                             <p className="text-sm text-[#598216]">
                                 {activeTab === "overview" ? "Real-time farmer management & yield analytics" :
                                     activeTab === "farmers" ? "Manage and monitor farmer accounts and data" :
                                         activeTab === "submissions" ? "View and manage farmer submissions and predictions" :
-                                            "Detailed analytics and insights for platform performance"}
+                                            activeTab === "predictions" ? "Make yield predictions and analyze results" :
+                                                "Detailed analytics and insights for platform performance"}
                             </p>
                         </div>
                         <div className="flex items-center gap-4">
@@ -1398,23 +1529,15 @@ export default function AdminDashboard() {
                                             <Icons.Download />
                                             Export CSV
                                         </button>
-                                        <select
-                                            value={filterStatus}
-                                            onChange={e => setFilterStatus(e.target.value)}
-                                            className="px-4 py-2 border border-green-300 rounded-lg text-sm focus:ring-2 focus:ring-[#598216] focus:border-transparent"
-                                        >
-                                            <option value="All">All Status</option>
-                                            <option value="Active">Active</option>
-                                            <option value="Inactive">Inactive</option>
-                                        </select>
+                                        
                                         <div className="relative">
-                                            <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                         
                                             <input
                                                 type="text"
                                                 placeholder="Search farmers..."
                                                 value={searchTerm}
                                                 onChange={e => setSearchTerm(e.target.value)}
-                                                className="pl-10 pr-4 py-2 border border-green-300 rounded-lg text-sm w-64 focus:ring-2 focus:ring-[#598216] focus:border-transparent"
+                                                className="pl-10 pr-4 py-2 border border-green-300 text-black rounded-lg text-sm w-64 focus:ring-2 focus:ring-[#598216] focus:border-transparent"
                                             />
                                         </div>
                                     </div>
@@ -1443,15 +1566,7 @@ export default function AdminDashboard() {
                                 <>
                                     <div className="overflow-x-auto">
                                         <table className="w-full">
-                                            <thead className="bg-green-50">
-                                                <tr>
-                                                    {["Farmer", "Phone", "Location", "Yield(t/ha)", "Status", "Last Activity", "Actions"].map(h => (
-                                                        <th key={h} className="px-6 py-4 text-left text-xs font-bold text-[#598216]  tracking-wider">
-                                                            {h}
-                                                        </th>
-                                                    ))}
-                                                </tr>
-                                            </thead>
+                                            
                                             <tbody className="divide-y divide-green-100">
                                                 {filteredFarmers.map((farmer, index) => (
                                                     <tr key={farmer.id || farmer._id || index} className="hover:bg-green-50 transition">
@@ -1489,14 +1604,7 @@ export default function AdminDashboard() {
                                                         <td className="px-6 py-4 text-xs text-[#598216]">
                                                             {safeFormatDate(farmer.lastPrediction || farmer.updated_at || farmer.created_at, 'MMM d, HH:mm')}
                                                         </td>
-                                                        <td className="px-6 py-4">
-                                                            <button
-                                                                onClick={() => setSelectedFarmer(farmer)}
-                                                                className="text-[#598216] hover:text-[#4a6d12] font-medium text-sm hover:underline"
-                                                            >
-                                                                View Details
-                                                            </button>
-                                                        </td>
+                                                        
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -1545,6 +1653,43 @@ export default function AdminDashboard() {
                                         </p>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-3">
+                                        {/* Export Dropdown */}
+                                        <div className="relative group">
+                                            <button className="px-4 py-2 bg-[#598216] text-white rounded-lg hover:bg-[#4a6d12] transition text-sm font-medium flex items-center gap-2">
+                                                <Icons.Download />
+                                                Export Data
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+                                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-green-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                                                <button
+                                                    onClick={() => downloadSubmissionsCSV(recentSubmissions)}
+                                                    className="w-full text-left px-4 py-3 text-sm text-[#598216] hover:bg-green-50 rounded-t-lg border-b border-green-100 flex items-center gap-2"
+                                                >
+                                                    <Icons.Download className="w-4 h-4" />
+                                                    Export All Submissions
+                                                </button>
+                                                <button
+                                                    onClick={() => downloadSubmissionsStatsCSV(recentSubmissions, stats)}
+                                                    className="w-full text-left px-4 py-3 text-sm text-[#598216] hover:bg-green-50 border-b border-green-100 flex items-center gap-2"
+                                                >
+                                                    <Icons.Chart className="w-4 h-4" />
+                                                    Export Statistics Report
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const yieldSubmissions = recentSubmissions.filter(sub => sub.actual_yield_tons_per_ha);
+                                                        downloadSubmissionsCSV(yieldSubmissions, `smartgwiza-yield-data-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+                                                    }}
+                                                    className="w-full text-left px-4 py-3 text-sm text-[#598216] hover:bg-green-50 rounded-b-lg flex items-center gap-2"
+                                                >
+                                                    <Icons.Yield className="w-4 h-4" />
+                                                    Export Yield Data Only
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         <button
                                             onClick={() => {
                                                 fetchRecentSubmissions()
@@ -1647,6 +1792,237 @@ export default function AdminDashboard() {
                                     </table>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Predictions Tab Content */}
+                    {activeTab === "predictions" && (
+                        <div className="space-y-6">
+                            {/* Prediction Type Selection */}
+                            <div className="bg-white rounded-2xl shadow-lg border border-green-100 p-6">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-[#598216]">Yield Prediction Tools</h3>
+                                        <p className="text-sm text-[#598216]">Choose between field-level and national-level predictions</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-3">
+                                        <button
+                                            onClick={() => setIsNationalPredictionOpen(true)}
+                                            className="px-4 py-2 bg-green-700
+                                             text-white rounded-lg hover:bg-green-700 transition text-sm font-medium flex items-center gap-2"
+                                        >
+                                            <Icons.Chart />
+                                            National Level Prediction
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Prediction Statistics */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                                    <div className="bg-gradient-to-r from-[#598216]/10 to-[#598216]/5 rounded-xl p-6 border border-[#598216]/20">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 bg-[#598216] rounded-lg flex items-center justify-center text-white">
+                                                <Icons.Prediction />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-[#598216]">Total Predictions</p>
+                                                <p className="text-2xl font-bold text-[#598216]">{stats.total_predictions}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-white">
+                                                <Icons.Chart />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-green-600">Avg Predicted Yield</p>
+                                                <p className="text-2xl font-bold text-green-700">{stats.average_yield} t/ha</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-white">
+                                                <Icons.Yield />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-green-600">Prediction Accuracy</p>
+                                                <p className="text-2xl font-bold text-green-700">85%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Two-column layout for prediction forms */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Field-Level Prediction Form */}
+                                    <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                                        <h4 className="text-lg font-semibold text-[#598216] mb-4">Field-Level Prediction</h4>
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            Make predictions for specific field conditions with detailed parameters.
+                                        </p>
+                                        <PredictionForm
+                                            districts={districts}
+                                            loadingDistricts={loadingDistricts}
+                                            onPredictionSubmit={handleAdminPredictionSubmit}
+                                            isSubmitting={isSubmittingPrediction}
+                                            error={predictionError}
+                                            prediction={predictionResult}
+                                            onNewPrediction={handleNewPrediction}
+                                        />
+                                    </div>
+
+                                    {/* National-Level Prediction Info */}
+                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                                        <h4 className="text-lg font-semibold text-green-700 mb-4">National-Level Prediction</h4>
+                                        <p className="text-sm text-green-700 mb-4">
+                                            Predict maize yield at the national level using historical and macroeconomic data.
+                                        </p>
+
+                                        <div className="space-y-3 mb-6">
+                                            <div className="flex items-center gap-3 text-sm text-green-700">
+                                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <span className="text-xs font-bold">1</span>
+                                                </div>
+                                                <span>Uses national-level data (pesticides, temperature)</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-sm text-green-700">
+                                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <span className="text-xs font-bold">2</span>
+                                                </div>
+                                                <span>Provides country-wide yield estimates</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-sm text-green-700">
+                                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <span className="text-xs font-bold">3</span>
+                                                </div>
+                                                <span>Ideal for policy planning and analysis</span>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => setIsNationalPredictionOpen(true)}
+                                            className="w-full px-4 py-3 bg-green-700 text-white rounded-lg hover:bg-green-700 transition font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <Icons.Chart />
+                                            Open National Prediction Tool
+                                        </button>
+
+                                        {nationalPredictionResult && (
+                                            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Icons.Check className="h-4 w-4 text-green-600" />
+                                                    <span className="text-sm font-medium text-green-800">Latest National Prediction</span>
+                                                </div>
+                                                <div className="text-center">
+                                                    <p className="text-2xl font-bold text-green-700">{nationalPredictionResult.value} tons/ha</p>
+                                                    <p className="text-sm text-green-600 capitalize">{nationalPredictionResult.category} Yield</p>
+                                                    <p className="text-xs text-green-500 mt-1">
+                                                        Year: {nationalPredictionResult.formData.year}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Recent Predictions Table */}
+                            <div className="bg-white rounded-2xl shadow-lg border border-green-100 overflow-hidden">
+                                <div className="p-6 border-b border-green-100">
+                                    <h3 className="text-lg font-semibold text-[#598216]">Recent Predictions</h3>
+                                    <p className="text-sm text-[#598216]">Latest predictions made through the platform</p>
+                                </div>
+
+                                {recentSubmissions.filter(sub => sub.predicted_yield).length === 0 && !nationalPredictionResult ? (
+                                    <div className="p-8 text-center">
+                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Icons.Prediction />
+                                        </div>
+                                        <p className="text-[#598216]">No prediction data available yet.</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead className="bg-green-50">
+                                                <tr>
+                                                    <th className="px-6 py-4 text-left text-xs font-bold text-[#598216] uppercase tracking-wider">Type</th>
+                                                    <th className="px-6 py-4 text-left text-xs font-bold text-[#598216] uppercase tracking-wider">Farmer/District</th>
+                                                    <th className="px-6 py-4 text-left text-xs font-bold text-[#598216] uppercase tracking-wider">Predicted Yield</th>
+                                                    <th className="px-6 py-4 text-left text-xs font-bold text-[#598216] uppercase tracking-wider">Confidence</th>
+                                                    <th className="px-6 py-4 text-left text-xs font-bold text-[#598216] uppercase tracking-wider">Date</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-green-100">
+                                                {/* Show national predictions first if any */}
+                                                {nationalPredictionResult && (
+                                                    <tr className="hover:bg-blue-50 transition">
+                                                        <td className="px-6 py-4">
+                                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-green-800">
+                                                                National
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-[#598216]">
+                                                            Rwanda (Country-wide)
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <span className="font-bold text-[#598216]">
+                                                                {nationalPredictionResult.value} t/ha
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 capitalize">
+                                                                {nationalPredictionResult.category}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-xs text-[#598216]">
+                                                            {safeFormatDate(new Date().toISOString(), 'MMM d, HH:mm')}
+                                                        </td>
+                                                    </tr>
+                                                )}
+
+                                                {/* Field-level predictions */}
+                                                {recentSubmissions
+                                                    .filter(sub => sub.predicted_yield)
+                                                    .slice(0, 10)
+                                                    .map((submission, index) => (
+                                                        <tr key={index} className="hover:bg-green-50 transition">
+                                                            <td className="px-6 py-4">
+                                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                    Field
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <div className="font-medium text-[#598216]">
+                                                                    {submission.user_name || "Unknown Farmer"}
+                                                                </div>
+                                                                <div className="text-xs text-[#598216]">
+                                                                    {submission.district || "Unknown District"}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <span className="font-bold text-[#598216]">
+                                                                    {submission.predicted_yield} t/ha
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                    High
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-xs text-[#598216]">
+                                                                {safeFormatDate(submission.created_at, 'MMM d, HH:mm')}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -1799,9 +2175,9 @@ export default function AdminDashboard() {
                         </div>
                         <div className="p-6 grid md:grid-cols-2 gap-6">
                             {[
-                                
+
                                 { label: "Average Yield", value: `${selectedFarmer.yield || selectedFarmer.average_yield || selectedFarmer.predicted_yield || '0'} t/ha`, icon: Icons.Yield },
-            
+
                                 { label: "Phone", value: selectedFarmer.phone || selectedFarmer.phone_number || 'N/A', icon: Icons.Phone },
                                 { label: "Location", value: selectedFarmer.location || selectedFarmer.district || 'Unknown', icon: Icons.Location },
                                 { label: "Status", value: selectedFarmer.status || (selectedFarmer.is_active ? 'Active' : 'Inactive'), icon: Icons.Chart },
@@ -1821,10 +2197,17 @@ export default function AdminDashboard() {
                                 </div>
                             ))}
                         </div>
-                       
+
                     </div>
                 </div>
             )}
+
+            {/* National Prediction Modal */}
+            <NationalPredictionForm
+                isOpen={isNationalPredictionOpen}
+                onClose={() => setIsNationalPredictionOpen(false)}
+                onPredictionSuccess={handleNationalPredictionSuccess}
+            />
         </div>
     )
 }
